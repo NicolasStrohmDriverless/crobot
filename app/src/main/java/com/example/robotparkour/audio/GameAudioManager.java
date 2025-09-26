@@ -20,6 +20,7 @@ public class GameAudioManager {
 
     private SoundPool soundPool;
     private MediaPlayer mediaPlayer;
+    private int currentMusicResId;
 
     private int jumpSoundId;
     private int coinSoundId;
@@ -32,7 +33,8 @@ public class GameAudioManager {
         this.context = context.getApplicationContext();
         createSoundPool();
         loadEffects();
-        prepareMediaPlayer();
+        currentMusicResId = 0;
+        setMusicTrack(R.raw.background);
     }
 
     private void createSoundPool() {
@@ -59,11 +61,31 @@ public class GameAudioManager {
         return soundPool.load(context, resId, 1);
     }
 
-    private void prepareMediaPlayer() {
-        mediaPlayer = MediaPlayer.create(context, R.raw.background);
+    private void releaseMediaPlayer() {
+        if (mediaPlayer != null) {
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
+        currentMusicResId = 0;
+    }
+
+    public void setMusicTrack(@RawRes int resId) {
+        if (resId == 0 || (mediaPlayer != null && currentMusicResId == resId)) {
+            currentMusicResId = resId;
+            return;
+        }
+
+        boolean resumePlayback = mediaPlayer != null && mediaPlayer.isPlaying();
+        releaseMediaPlayer();
+
+        mediaPlayer = MediaPlayer.create(context, resId);
         if (mediaPlayer != null) {
             mediaPlayer.setLooping(true);
             mediaPlayer.setVolume(0.4f, 0.4f);
+            currentMusicResId = resId;
+            if (musicEnabled && resumePlayback) {
+                mediaPlayer.start();
+            }
         }
     }
 
@@ -87,7 +109,13 @@ public class GameAudioManager {
     }
 
     public void startMusic() {
-        if (!musicEnabled || mediaPlayer == null) {
+        if (!musicEnabled) {
+            return;
+        }
+        if (mediaPlayer == null) {
+            setMusicTrack(R.raw.background);
+        }
+        if (mediaPlayer == null) {
             return;
         }
         if (!mediaPlayer.isPlaying()) {
@@ -114,10 +142,7 @@ public class GameAudioManager {
             soundPool.release();
             soundPool = null;
         }
-        if (mediaPlayer != null) {
-            mediaPlayer.release();
-            mediaPlayer = null;
-        }
+        releaseMediaPlayer();
     }
 
     public void setSoundEnabled(boolean enabled) {

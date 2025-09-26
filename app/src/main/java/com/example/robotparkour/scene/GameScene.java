@@ -10,6 +10,7 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 
 import com.example.robotparkour.audio.GameAudioManager;
+import com.example.robotparkour.audio.WorldMusicLibrary;
 import com.example.robotparkour.core.Scene;
 import com.example.robotparkour.core.SceneManager;
 import com.example.robotparkour.core.SceneType;
@@ -93,6 +94,7 @@ public class GameScene implements Scene {
     }
 
     public void resetForNewRun() {
+        audioManager.setMusicTrack(WorldMusicLibrary.getTrackFor(sceneManager.getSelectedWorld()));
         elapsedSeconds = 0f;
         collectedCoins = 0;
         lives = INITIAL_LIVES;
@@ -122,6 +124,7 @@ public class GameScene implements Scene {
     @Override
     public void onEnter() {
         running = true;
+        audioManager.setMusicTrack(WorldMusicLibrary.getTrackFor(sceneManager.getSelectedWorld()));
         audioManager.startMusic();
     }
 

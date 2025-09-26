@@ -92,7 +92,7 @@ public class SettingsScene implements Scene {
         canvas.drawRoundRect(bounds, 24f, 24f, paint);
         paint.setColor(Color.WHITE);
         paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(bounds.height() * 0.45f);
+        paint.setTextSize(bounds.height() * 0.55f);
         canvas.drawText(text, bounds.centerX(), bounds.centerY() + paint.getTextSize() * 0.3f, paint);
     }
 
@@ -135,7 +135,8 @@ public class SettingsScene implements Scene {
         float firstY = height * 0.35f;
         soundToggle.set(centerX - toggleWidth / 2f, firstY, centerX + toggleWidth / 2f, firstY + toggleHeight);
         musicToggle.set(centerX - toggleWidth / 2f, firstY + toggleHeight * 1.3f, centerX + toggleWidth / 2f, firstY + toggleHeight * 2.3f);
-        backButton.set(centerX - toggleWidth / 2f, height * 0.7f, centerX + toggleWidth / 2f, height * 0.7f + toggleHeight);
+        float buttonWidth = toggleWidth * 0.5f;
+        backButton.set(centerX - buttonWidth / 2f, height * 0.7f, centerX + buttonWidth / 2f, height * 0.7f + toggleHeight);
     }
 
     @Override

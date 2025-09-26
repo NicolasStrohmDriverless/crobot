@@ -374,7 +374,7 @@ public class WorldSelectScene implements Scene {
         canvas.drawRoundRect(bounds, 24f, 24f, paint);
         paint.setColor(Color.WHITE);
         paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(bounds.height() * 0.19f);
+        paint.setTextSize(bounds.height() * 0.24f);
         canvas.drawText(text, bounds.centerX(), bounds.centerY() + paint.getTextSize() * 0.3f, paint);
     }
 
@@ -450,7 +450,7 @@ public class WorldSelectScene implements Scene {
                     centerY + cardHeight / 2f);
         }
 
-        float buttonWidth = width * 0.2f;
+        float buttonWidth = width * 0.1f;
         float buttonHeight = height * 0.07f;
         float buttonLeft = padding * 0.6f;
         float buttonTop = height - padding - buttonHeight;

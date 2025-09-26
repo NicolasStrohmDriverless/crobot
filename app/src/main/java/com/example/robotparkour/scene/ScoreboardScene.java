@@ -89,7 +89,7 @@ public class ScoreboardScene implements Scene {
         canvas.drawRoundRect(bounds, 24f, 24f, paint);
         paint.setColor(Color.WHITE);
         paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(bounds.height() * 0.45f);
+        paint.setTextSize(bounds.height() * 0.55f);
         canvas.drawText(text, bounds.centerX(), bounds.centerY() + paint.getTextSize() * 0.3f, paint);
     }
 
@@ -120,7 +120,7 @@ public class ScoreboardScene implements Scene {
     public void onSurfaceChanged(int width, int height) {
         surfaceWidth = width;
         surfaceHeight = height;
-        float buttonWidth = width * 0.5f;
+        float buttonWidth = width * 0.25f;
         float buttonHeight = height * 0.09f;
         float centerX = width / 2f;
         backButton.set(centerX - buttonWidth / 2f, height * 0.8f, centerX + buttonWidth / 2f, height * 0.8f + buttonHeight);

@@ -79,7 +79,7 @@ public class GameOverScene implements Scene {
         }
 
         drawButton(canvas, retryButton, "Retry");
-        drawButton(canvas, menuButton, "Menu");
+        drawButton(canvas, menuButton, "Karte");
         drawButton(canvas, scoresButton, "Scoreboard");
     }
 
@@ -102,7 +102,7 @@ public class GameOverScene implements Scene {
                 sceneManager.startNewGame();
                 return true;
             } else if (menuButton.contains(x, y)) {
-                sceneManager.switchTo(SceneType.MENU);
+                sceneManager.showWorldSelect();
                 return true;
             } else if (scoresButton.contains(x, y)) {
                 sceneManager.showScoreboard();
