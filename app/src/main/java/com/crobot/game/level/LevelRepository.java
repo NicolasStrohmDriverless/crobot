@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.res.AssetManager;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -65,10 +66,35 @@ public final class LevelRepository {
 
     @NonNull
     public LevelModel loadLevel(int world, int stage) throws IOException {
+        IOException nativeException = null;
+        try {
+            LevelModel nativeLevel = loadNativeLevel(world, stage);
+            if (nativeLevel != null) {
+                return nativeLevel;
+            }
+        } catch (IOException ex) {
+            nativeException = ex;
+        } catch (RuntimeException ex) {
+            nativeException = new IOException("Native level pipeline failed", ex);
+        }
+
+        LevelModel legacyLevel = LegacyWorldData.createLevelModel(world, stage);
+        if (legacyLevel != null) {
+            return legacyLevel;
+        }
+
+        if (nativeException != null) {
+            throw nativeException;
+        }
+        throw new IOException("Unable to load level " + world + "-" + stage);
+    }
+
+    @Nullable
+    private LevelModel loadNativeLevel(int world, int stage) throws IOException {
         synchronized (NATIVE_LOCK) {
             int[] tileData = nativeLoadTileMap(world, stage);
             if (tileData == null) {
-                throw new IOException("nativeLoadTileMap returned null");
+                return null;
             }
             int[] dimensions = nativeGetLevelDimensions();
             if (dimensions == null || dimensions.length < 4) {

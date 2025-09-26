@@ -100,7 +100,7 @@ public class GameActivity extends AppCompatActivity {
                     if (loadingView != null) {
                         loadingView.setVisibility(View.GONE);
                     }
-                    gameView.bindLevel(level);
+                    gameView.bindLevel(level, world, stage);
                 });
             } catch (IOException | RuntimeException ex) {
                 mainHandler.post(() -> {
