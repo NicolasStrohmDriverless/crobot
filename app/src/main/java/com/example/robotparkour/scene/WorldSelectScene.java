@@ -155,11 +155,11 @@ public class WorldSelectScene implements Scene {
     private void drawHeader(Canvas canvas) {
         paint.setColor(Color.WHITE);
         paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(surfaceWidth * 0.058f);
+        paint.setTextSize(surfaceWidth * 0.029f);
         canvas.drawText("Programmierer-Schatzkarte", surfaceWidth / 2f, surfaceHeight * 0.13f, paint);
 
         paint.setColor(Color.parseColor("#7FB3FF"));
-        paint.setTextSize(surfaceWidth * 0.032f);
+        paint.setTextSize(surfaceWidth * 0.020f);
         canvas.drawText("Folge der gestrichelten Route zum NullPointer-Nexus", surfaceWidth / 2f, surfaceHeight * 0.19f, paint);
     }
 
@@ -305,18 +305,18 @@ public class WorldSelectScene implements Scene {
         paint.setStyle(Paint.Style.FILL);
         paint.setTextAlign(Paint.Align.CENTER);
         paint.setColor(Color.parseColor("#88C7FF"));
-        paint.setTextSize(cardHeight * 0.14f);
+        paint.setTextSize(cardHeight * 0.12f);
         String label = card.worldInfo.getProgramNumber() >= 9
                 ? "final.class"
                 : "Program " + card.worldInfo.getProgramNumber();
         canvas.drawText(label, centerX, top + cardHeight * 0.28f, paint);
 
         paint.setColor(Color.WHITE);
-        paint.setTextSize(cardHeight * 0.20f);
+        paint.setTextSize(cardHeight * 0.16f);
         canvas.drawText(card.worldInfo.getName(), centerX, top + cardHeight * 0.55f, paint);
 
         paint.setColor(Color.parseColor("#C9E6FF"));
-        paint.setTextSize(cardHeight * 0.15f);
+        paint.setTextSize(cardHeight * 0.12f);
         float textAreaWidth = card.bounds.width() * 0.80f;
         float descStartY = top + cardHeight * 0.70f;
         float lineHeight = paint.getTextSize() * 1.20f;
@@ -324,7 +324,7 @@ public class WorldSelectScene implements Scene {
                 descStartY, textAreaWidth, lineHeight);
 
         paint.setColor(Color.parseColor("#7FB3FF"));
-        paint.setTextSize(cardHeight * 0.14f);
+        paint.setTextSize(cardHeight * 0.11f);
         String cta = isActive ? "tap(); // starten" : "load();";
         canvas.drawText(cta, centerX, Math.min(card.bounds.bottom - cardHeight * 0.12f, descStartY + lineHeight), paint);
     }
@@ -374,7 +374,7 @@ public class WorldSelectScene implements Scene {
         canvas.drawRoundRect(bounds, 24f, 24f, paint);
         paint.setColor(Color.WHITE);
         paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(bounds.height() * 0.38f);
+        paint.setTextSize(bounds.height() * 0.19f);
         canvas.drawText(text, bounds.centerX(), bounds.centerY() + paint.getTextSize() * 0.3f, paint);
     }
 
