@@ -62,55 +62,55 @@ public class WorldSelectScene implements Scene {
                         1,
                         "Pointer Plains",
                         "Startwelt, leicht & freundlich"),
-                0.12f, 0.42f, 1.05f));
+                0.16f, 0.40f, 1.12f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         2,
                         "Template Temple",
                         "komplex, verschachtelt"),
-                0.28f, 0.26f, 1.0f));
+                0.30f, 0.25f, 1.08f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         3,
                         "Namespace Nebula",
                         "spacey, schwebend"),
-                0.50f, 0.22f, 0.95f));
+                0.52f, 0.18f, 1.02f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         4,
                         "Exception Volcano",
                         "heiß, leicht bedrohlich – kein Boss, nur Spannung"),
-                0.78f, 0.30f, 1.05f));
+                0.76f, 0.30f, 1.12f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         5,
                         "STL City",
                         "geschäftig, groovy"),
-                0.80f, 0.55f, 1.0f));
+                0.84f, 0.50f, 1.08f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         6,
                         "Heap Caverns",
                         "dunkel, hohl, vorsichtig"),
-                0.58f, 0.72f, 1.0f));
+                0.64f, 0.68f, 1.10f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         7,
                         "Lambda Gardens",
                         "verspielt, naturhaft, \"funky nerdy\""),
-                0.32f, 0.66f, 1.05f));
+                0.38f, 0.74f, 1.16f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         8,
                         "Multithread Foundry",
                         "antriebsstark, mechanisch"),
-                0.18f, 0.55f, 0.95f));
+                0.22f, 0.60f, 1.02f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         9,
                         "NullPointer-Nexus",
                         "Der Kernel-Kerker"),
-                0.50f, 0.82f, 1.35f));
+                0.48f, 0.84f, 1.40f));
     }
 
     @Override
@@ -182,11 +182,41 @@ public class WorldSelectScene implements Scene {
 
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(Color.parseColor("#06202F"));
-        paint.setAlpha(140);
-        canvas.drawCircle(surfaceWidth * 0.18f, surfaceHeight * 0.32f, surfaceWidth * 0.12f, paint);
-        canvas.drawCircle(surfaceWidth * 0.78f, surfaceHeight * 0.40f, surfaceWidth * 0.16f, paint);
-        canvas.drawCircle(surfaceWidth * 0.46f, surfaceHeight * 0.74f, surfaceWidth * 0.18f, paint);
+        paint.setAlpha(150);
+        drawCurvyIsland(canvas, surfaceWidth * 0.22f, surfaceHeight * 0.36f,
+                surfaceWidth * 0.13f, surfaceHeight * 0.10f, 0.24f);
+        drawCurvyIsland(canvas, surfaceWidth * 0.76f, surfaceHeight * 0.38f,
+                surfaceWidth * 0.17f, surfaceHeight * 0.13f, 0.20f);
+        drawCurvyIsland(canvas, surfaceWidth * 0.48f, surfaceHeight * 0.72f,
+                surfaceWidth * 0.19f, surfaceHeight * 0.14f, 0.26f);
         paint.setAlpha(255);
+    }
+
+    private void drawCurvyIsland(Canvas canvas, float centerX, float centerY,
+                                 float radiusX, float radiusY, float wobble) {
+        Path islandPath = new Path();
+        int segments = 6;
+        for (int i = 0; i <= segments; i++) {
+            double angle = (Math.PI * 2.0 / segments) * i;
+            float sin = (float) Math.sin(angle);
+            float cos = (float) Math.cos(angle);
+            float radialX = radiusX * (1f + wobble * (float) Math.sin(angle * 2.1f));
+            float radialY = radiusY * (1f + wobble * (float) Math.cos(angle * 2.1f));
+            float x = centerX + cos * radialX;
+            float y = centerY + sin * radialY;
+            if (i == 0) {
+                islandPath.moveTo(x, y);
+            } else {
+                double controlAngle = angle - (Math.PI * 2.0 / segments) / 2.0;
+                float controlRadialX = radiusX * (1f + wobble * 0.6f * (float) Math.sin(controlAngle * 2.1f));
+                float controlRadialY = radiusY * (1f + wobble * 0.6f * (float) Math.cos(controlAngle * 2.1f));
+                float controlX = centerX + (float) Math.cos(controlAngle) * controlRadialX;
+                float controlY = centerY + (float) Math.sin(controlAngle) * controlRadialY;
+                islandPath.quadTo(controlX, controlY, x, y);
+            }
+        }
+        islandPath.close();
+        canvas.drawPath(islandPath, paint);
     }
 
     private void drawDottedPath(Canvas canvas) {
@@ -195,21 +225,46 @@ public class WorldSelectScene implements Scene {
         }
 
         Path path = new Path();
-        boolean started = false;
+        WorldCard previous = null;
+        int segmentIndex = 0;
         for (WorldCard card : worldCards) {
-            if (!started) {
+            if (previous == null) {
                 path.moveTo(card.centerX, card.centerY);
-                started = true;
-            } else {
-                path.lineTo(card.centerX, card.centerY);
+                previous = card;
+                continue;
             }
+
+            float dx = card.centerX - previous.centerX;
+            float dy = card.centerY - previous.centerY;
+            float distance = (float) Math.hypot(dx, dy);
+            if (distance == 0f) {
+                previous = card;
+                continue;
+            }
+
+            float perpX = -dy / distance;
+            float perpY = dx / distance;
+            float arcStrength = Math.min(distance * 0.22f, surfaceWidth * 0.14f);
+            float wiggle = (segmentIndex % 2 == 0) ? 1f : -1f;
+            float controlOffsetX = perpX * arcStrength * wiggle;
+            float controlOffsetY = perpY * arcStrength * wiggle;
+
+            float control1X = previous.centerX + dx * 0.33f + controlOffsetX;
+            float control1Y = previous.centerY + dy * 0.33f + controlOffsetY;
+            float control2X = previous.centerX + dx * 0.66f + controlOffsetX;
+            float control2Y = previous.centerY + dy * 0.66f + controlOffsetY;
+
+            path.cubicTo(control1X, control1Y, control2X, control2Y, card.centerX, card.centerY);
+
+            previous = card;
+            segmentIndex++;
         }
 
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(Math.max(4f, surfaceWidth * 0.004f));
+        paint.setStrokeWidth(Math.max(4f, surfaceWidth * 0.0035f));
         paint.setColor(Color.parseColor("#66C9E6FF"));
         paint.setStrokeCap(Paint.Cap.ROUND);
-        paint.setPathEffect(new DashPathEffect(new float[]{28f, 20f}, 0));
+        paint.setPathEffect(new DashPathEffect(new float[]{34f, 26f}, 0));
         canvas.drawPath(path, paint);
         paint.setPathEffect(null);
         paint.setStrokeCap(Paint.Cap.BUTT);
@@ -227,9 +282,9 @@ public class WorldSelectScene implements Scene {
         canvas.drawRoundRect(card.bounds, cornerRadius, cornerRadius, paint);
 
         paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(isActive ? 8f : 4f);
+        paint.setStrokeWidth(isActive ? 7f : 4f);
         paint.setColor(isActive ? Color.parseColor("#9CD2FF") : Color.parseColor("#2C4F66"));
-        paint.setPathEffect(new DashPathEffect(new float[]{18f, 14f}, 0));
+        paint.setPathEffect(new DashPathEffect(new float[]{24f, 16f}, 0));
         canvas.drawRoundRect(card.bounds, cornerRadius, cornerRadius, paint);
         paint.setPathEffect(null);
 
@@ -240,26 +295,26 @@ public class WorldSelectScene implements Scene {
         paint.setStyle(Paint.Style.FILL);
         paint.setTextAlign(Paint.Align.CENTER);
         paint.setColor(Color.parseColor("#88C7FF"));
-        paint.setTextSize(cardHeight * 0.18f);
+        paint.setTextSize(cardHeight * 0.16f);
         String label = card.worldInfo.getProgramNumber() >= 9
                 ? "final.class"
                 : "Program " + card.worldInfo.getProgramNumber();
         canvas.drawText(label, centerX, top + cardHeight * 0.28f, paint);
 
         paint.setColor(Color.WHITE);
-        paint.setTextSize(cardHeight * 0.28f);
+        paint.setTextSize(cardHeight * 0.24f);
         canvas.drawText(card.worldInfo.getName(), centerX, top + cardHeight * 0.55f, paint);
 
         paint.setColor(Color.parseColor("#C9E6FF"));
-        paint.setTextSize(cardHeight * 0.20f);
-        float textAreaWidth = card.bounds.width() * 0.76f;
+        paint.setTextSize(cardHeight * 0.18f);
+        float textAreaWidth = card.bounds.width() * 0.80f;
         float descStartY = top + cardHeight * 0.70f;
-        float lineHeight = paint.getTextSize() * 1.25f;
+        float lineHeight = paint.getTextSize() * 1.20f;
         descStartY = drawWrappedCenteredText(canvas, card.worldInfo.getDescription(), centerX,
                 descStartY, textAreaWidth, lineHeight);
 
         paint.setColor(Color.parseColor("#7FB3FF"));
-        paint.setTextSize(cardHeight * 0.19f);
+        paint.setTextSize(cardHeight * 0.17f);
         String cta = isActive ? "tap(); // starten" : "load();";
         canvas.drawText(cta, centerX, Math.min(card.bounds.bottom - cardHeight * 0.12f, descStartY + lineHeight), paint);
     }
@@ -351,7 +406,7 @@ public class WorldSelectScene implements Scene {
         surfaceHeight = height;
 
         float padding = width * 0.08f;
-        float baseSize = Math.min(width, height) * 0.17f;
+        float baseSize = Math.min(width, height) * 0.20f;
         float usableWidth = width - padding * 2f;
         float usableHeight = height - padding * 2f;
 
@@ -359,7 +414,7 @@ public class WorldSelectScene implements Scene {
             float centerX = padding + card.relX * usableWidth;
             float centerY = padding + card.relY * usableHeight;
             float cardWidth = baseSize * card.sizeMultiplier;
-            float cardHeight = cardWidth * 0.78f;
+            float cardHeight = cardWidth * 0.88f;
             card.centerX = centerX;
             card.centerY = centerY;
             card.bounds.set(
