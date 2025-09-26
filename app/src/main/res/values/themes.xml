@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.RobotIdeParkour" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/background_primary</item>
+        <item name="android:colorBackground">@color/background_primary</item>
+        <item name="android:statusBarColor">@color/background_secondary</item>
+        <item name="android:navigationBarColor">@color/background_secondary</item>
+    </style>
+</resources>
