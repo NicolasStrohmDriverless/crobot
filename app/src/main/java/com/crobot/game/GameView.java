@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.view.MotionEvent;
@@ -17,7 +18,11 @@ import android.view.SurfaceView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.crobot.game.level.LegacyWorldData;
 import com.crobot.game.level.LevelModel;
+import com.example.robotparkour.audio.GameAudioManager;
+import com.example.robotparkour.audio.WorldMusicLibrary;
+import com.example.robotparkour.core.WorldInfo;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,12 +40,18 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     private static final float GRAVITY = 1400f;
     private static final float MOVE_SPEED = 200f;
     private static final float JUMP_VELOCITY = -520f;
+    private static final int SAFE_TOP_PX = 64;
+    private static final int SAFE_BOTTOM_PX = 48;
+    private static final float BASE_SCROLL_SPEED = 120f;
 
     private final Paint backgroundPaint = new Paint();
     private final Paint entityPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint uiPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint tileFallbackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Rect srcRect = new Rect();
     private final Rect dstRect = new Rect();
+    private final RectF tempRectF = new RectF();
 
     private Thread renderThread;
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -53,45 +64,83 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     private int tilesetColumns;
 
     private final Player player = new Player();
+    private final GameAudioManager audioManager;
 
     private boolean moveLeft;
     private boolean moveRight;
     private boolean jumpPressed;
     private boolean jumpConsumed;
+    private boolean shouldPlayJumpSound;
 
     private float cameraX;
+    private float cameraY;
+    private float currentScale = 1f;
+    private float parallaxTimer;
+    private float animationTimer;
+    private int currentWorldNumber = 1;
+    private int currentStage = 1;
+    @Nullable
+    private WorldInfo currentWorldInfo;
 
     public GameView(@NonNull Context context) {
         super(context);
+        audioManager = new GameAudioManager(context.getApplicationContext());
         init();
     }
 
     public GameView(@NonNull Context context, @Nullable android.util.AttributeSet attrs) {
         super(context, attrs);
+        audioManager = new GameAudioManager(context.getApplicationContext());
         init();
     }
 
     private void init() {
         getHolder().addCallback(this);
         setFocusable(true);
-        backgroundPaint.setColor(Color.rgb(32, 48, 92));
+        backgroundPaint.setColor(Color.rgb(20, 26, 48));
         entityPaint.setColor(Color.YELLOW);
-        textPaint.setColor(Color.BLACK);
+        textPaint.setColor(Color.WHITE);
         textPaint.setTextSize(20f);
-        textPaint.setShadowLayer(2f, 1f, 1f, Color.WHITE);
+        textPaint.setShadowLayer(2f, 1f, 1f, Color.argb(160, 0, 0, 0));
+        uiPaint.setStyle(Paint.Style.FILL);
+        uiPaint.setColor(Color.WHITE);
+        tileFallbackPaint.setStyle(Paint.Style.FILL);
     }
 
-    public void bindLevel(@NonNull LevelModel level) {
+    public void bindLevel(@NonNull LevelModel level, int world, int stage) {
         this.level = level;
+        currentWorldNumber = Math.max(1, world);
+        currentStage = Math.max(1, stage);
+        currentWorldInfo = LegacyWorldData.findWorld(currentWorldNumber);
         cameraX = 0f;
-        player.width = level.getTileWidth() * 0.8f;
-        player.height = level.getTileHeight() * 1.6f;
-        player.x = level.getTileWidth() * 2f;
-        player.y = level.getPixelHeight() - level.getTileHeight() * 3f;
+        cameraY = 0f;
+        parallaxTimer = 0f;
+        animationTimer = 0f;
+        player.width = level.getTileWidth() * 0.82f;
+        player.height = level.getTileHeight() * 1.65f;
         player.vx = 0f;
         player.vy = 0f;
         player.onGround = false;
+        player.facingRight = true;
+        shouldPlayJumpSound = false;
+
+        boolean spawnFound = false;
+        for (LevelModel.Entity entity : level.getEntities()) {
+            if ("spawn".equalsIgnoreCase(entity.getType())) {
+                player.x = entity.getX();
+                player.y = entity.getY();
+                spawnFound = true;
+                break;
+            }
+        }
+        if (!spawnFound) {
+            player.x = level.getTileWidth() * 2.5f;
+            player.y = level.getPixelHeight() - level.getTileHeight() * 2f;
+        }
+
         loadTilesetBitmap(level.getTilesetAssetPath());
+        updateScale(level);
+        configureMusic();
     }
 
     private void loadTilesetBitmap(@NonNull String assetPath) {
@@ -111,6 +160,24 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         }
     }
 
+    private void updateScale(@NonNull LevelModel level) {
+        int viewHeight = getHeight();
+        if (viewHeight <= 0) {
+            return;
+        }
+        float desiredScale = viewHeight / (float) Math.max(level.getPixelHeight(), 1);
+        if (!Float.isFinite(desiredScale) || desiredScale <= 0f) {
+            desiredScale = 1f;
+        }
+        currentScale = desiredScale;
+    }
+
+    private void configureMusic() {
+        audioManager.stopMusic();
+        audioManager.setMusicTrack(WorldMusicLibrary.getTrackFor(currentWorldInfo));
+        audioManager.startMusic();
+    }
+
     @Override
     public void surfaceCreated(@NonNull SurfaceHolder holder) {
         surfaceReady = true;
@@ -119,7 +186,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
     @Override
     public void surfaceChanged(@NonNull SurfaceHolder holder, int format, int width, int height) {
-        // No-op
+        LevelModel level = this.level;
+        if (level != null) {
+            updateScale(level);
+        }
     }
 
     @Override
@@ -185,18 +255,26 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         if (level == null) {
             return;
         }
+        parallaxTimer += deltaSeconds;
+        animationTimer += deltaSeconds;
+        updateScale(level);
         handleInput(deltaSeconds);
         applyPhysics(deltaSeconds, level);
+        if (shouldPlayJumpSound) {
+            audioManager.playJump();
+            shouldPlayJumpSound = false;
+        }
         updateCamera(level);
     }
 
     private void handleInput(float deltaSeconds) {
         player.vx = 0f;
-        if (moveLeft) {
+        if (moveLeft && !moveRight) {
             player.vx -= MOVE_SPEED;
-        }
-        if (moveRight) {
+            player.facingRight = false;
+        } else if (moveRight && !moveLeft) {
             player.vx += MOVE_SPEED;
+            player.facingRight = true;
         }
         if (!jumpPressed) {
             jumpConsumed = false;
@@ -205,6 +283,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             player.vy = JUMP_VELOCITY;
             player.onGround = false;
             jumpConsumed = true;
+            shouldPlayJumpSound = true;
         }
     }
 
@@ -314,93 +393,631 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     }
 
     private void updateCamera(@NonNull LevelModel level) {
-        int viewWidth = getWidth();
-        float target = player.x - viewWidth * 0.4f;
-        target = Math.max(target, 0f);
-        float maxScroll = Math.max(0, level.getPixelWidth() - viewWidth);
-        cameraX = Math.max(0f, Math.min(target, maxScroll));
+        float scale = currentScale > 0f ? currentScale : 1f;
+        float viewWidthWorld = getWidth() / scale;
+        float viewHeightWorld = getHeight() / scale;
+
+        float targetX = player.x - viewWidthWorld * 0.4f;
+        float maxScrollX = Math.max(0f, level.getPixelWidth() - viewWidthWorld);
+        cameraX = clamp(targetX, 0f, maxScrollX);
+
+        float desiredFloorY = Math.max(0f, level.getPixelHeight() - viewHeightWorld);
+        float targetY = Math.max(desiredFloorY, player.y - viewHeightWorld * 0.7f);
+        float maxScrollY = Math.max(0f, level.getPixelHeight() - viewHeightWorld);
+        cameraY = clamp(targetY, 0f, maxScrollY);
     }
 
     private void render(@NonNull Canvas canvas) {
-        canvas.drawRect(0, 0, canvas.getWidth(), canvas.getHeight(), backgroundPaint);
+        int width = canvas.getWidth();
+        int height = canvas.getHeight();
+        canvas.drawRect(0, 0, width, height, backgroundPaint);
         LevelModel level = this.level;
         if (level == null) {
             return;
         }
+        drawParallaxBackground(canvas);
         drawTiles(canvas, level);
         drawEntities(canvas, level);
         drawPlayer(canvas);
         drawHud(canvas, level);
     }
 
-    private void drawTiles(@NonNull Canvas canvas, @NonNull LevelModel level) {
-        if (tileset == null || tilesetColumns <= 0) {
+    private void drawParallaxBackground(@NonNull Canvas canvas) {
+        int width = canvas.getWidth();
+        int height = canvas.getHeight();
+        if (width <= 0 || height <= 0) {
             return;
         }
+        canvas.save();
+        drawPointerPlainsBackground(canvas, width, height, parallaxTimer);
+        canvas.restore();
+        drawStatusBar(canvas, width, height);
+        drawScanlineOverlay(canvas, width, height);
+    }
+
+    private void drawPointerPlainsBackground(@NonNull Canvas canvas,
+                                             int width,
+                                             int height,
+                                             float time) {
+        paintSolidBackground(canvas, Color.parseColor("#1E1E1E"), width, height);
+
+        float tabPeriod = Math.max(width / 4f, 320f);
+        float tabOffset = computeLoopOffset(time, BASE_SCROLL_SPEED * 0.2f, tabPeriod);
+        for (float x = -tabPeriod; x < width + tabPeriod; x += tabPeriod) {
+            float left = x - tabOffset;
+            RectF outer = new RectF(left + tabPeriod * 0.08f, 12f,
+                    left + tabPeriod * 0.72f, SAFE_TOP_PX - 12f);
+            uiPaint.setColor(Color.parseColor("#252526"));
+            canvas.drawRoundRect(outer, 26f, 26f, uiPaint);
+            uiPaint.setColor(Color.parseColor("#2D2D2D"));
+            canvas.drawRoundRect(new RectF(outer.left + 12f, outer.top + 8f,
+                    outer.right - 12f, outer.bottom - 8f), 20f, 20f, uiPaint);
+        }
+        uiPaint.setColor(Color.parseColor("#1F1F1F"));
+        RectF active = new RectF(width * 0.34f, 8f, width * 0.58f, SAFE_TOP_PX - 10f);
+        canvas.drawRoundRect(active, 28f, 28f, uiPaint);
+        uiPaint.setColor(Color.parseColor("#252526"));
+        canvas.drawRoundRect(new RectF(active.left + 12f, active.top + 10f,
+                active.right - 12f, active.bottom - 14f), 22f, 22f, uiPaint);
+
+        float farPeriod = Math.max(width / 3f, 280f);
+        drawHillBand(canvas, width, height * 0.58f, height,
+                farPeriod, computeLoopOffset(time, BASE_SCROLL_SPEED * 0.2f, farPeriod),
+                height * 0.12f, Color.parseColor("#1B2C33"));
+        drawHillBand(canvas, width, height * 0.68f, height,
+                farPeriod * 0.8f, computeLoopOffset(time, BASE_SCROLL_SPEED * 0.35f, farPeriod * 0.8f),
+                height * 0.16f, Color.parseColor("#15252B"));
+
+        float bushPeriod = Math.max(width / 2.6f, 260f);
+        float bushOffset = computeLoopOffset(time, BASE_SCROLL_SPEED * 0.5f, bushPeriod);
+        for (float x = -bushPeriod; x < width + bushPeriod; x += bushPeriod) {
+            float left = x - bushOffset + width * 0.05f;
+            RectF bush = new RectF(left, height * 0.62f,
+                    left + bushPeriod * 0.64f, height * 0.82f);
+            uiPaint.setColor(Color.parseColor("#1F241F"));
+            canvas.drawRoundRect(bush, 40f, 40f, uiPaint);
+            uiPaint.setColor(Color.parseColor("#2A3A29"));
+            canvas.drawRoundRect(new RectF(bush.left + 14f, bush.top + 14f,
+                    bush.right - 14f, bush.bottom - 14f), 34f, 34f, uiPaint);
+        }
+
+        drawIndentGuides(canvas, width, width * 0.22f, SAFE_TOP_PX + 16f,
+                height - SAFE_BOTTOM_PX - 36f, width * 0.05f,
+                Color.parseColor("#283238"),
+                computeLoopOffset(time, BASE_SCROLL_SPEED * 0.2f, width * 0.05f));
+
+        uiPaint.setColor(Color.parseColor("#CE9178"));
+        uiPaint.setTextAlign(Paint.Align.CENTER);
+        uiPaint.setTextSize(height * 0.045f);
+        for (int i = 0; i < 7; i++) {
+            float px = width * (0.18f + i * 0.12f);
+            float py = height * 0.6f + (float) Math.sin(time * 1.4f + i) * 12f;
+            canvas.drawText(";", px, py, uiPaint);
+        }
+
+        uiPaint.setColor(Color.parseColor("#DCDCAA"));
+        uiPaint.setAlpha(120);
+        float glintOffset = computeLoopOffset(time, BASE_SCROLL_SPEED * 0.5f, width * 0.18f);
+        for (float x = -width * 0.18f; x < width + width * 0.18f; x += width * 0.18f) {
+            float left = x - glintOffset;
+            canvas.drawRect(left, SAFE_TOP_PX + height * 0.14f,
+                    left + width * 0.04f, SAFE_TOP_PX + height * 0.38f, uiPaint);
+        }
+        uiPaint.setAlpha(255);
+
+        drawGutterRail(canvas, width, height, width * 0.05f, Color.parseColor("#141414"),
+                Color.parseColor("#F14C4C"), time, 0.8f, 0.32f);
+        drawMinimapColumn(canvas, width, height, Color.parseColor("#1B3443"),
+                Color.parseColor("#2E4F60"), Color.parseColor("#4FC1FF"), time, 0.5f);
+    }
+
+    private void paintSolidBackground(@NonNull Canvas canvas, int color, int width, int height) {
+        uiPaint.setStyle(Paint.Style.FILL);
+        uiPaint.setColor(color);
+        canvas.drawRect(0f, 0f, width, height, uiPaint);
+    }
+
+    private void drawStatusBar(@NonNull Canvas canvas, int width, int height) {
+        uiPaint.setStyle(Paint.Style.FILL);
+        uiPaint.setColor(Color.parseColor("#007ACC"));
+        canvas.drawRect(0f, height - SAFE_BOTTOM_PX, width, height, uiPaint);
+    }
+
+    private void drawScanlineOverlay(@NonNull Canvas canvas, int width, int height) {
+        uiPaint.setStyle(Paint.Style.FILL);
+        uiPaint.setColor(Color.argb(18, 255, 255, 255));
+        for (float y = SAFE_TOP_PX; y < height - SAFE_BOTTOM_PX; y += 4f) {
+            canvas.drawRect(0f, y, width, y + 1f, uiPaint);
+        }
+    }
+
+    private float computeLoopOffset(float time, float speed, float period) {
+        if (period <= 0f) {
+            return 0f;
+        }
+        float shift = (time * speed) % period;
+        if (shift < 0f) {
+            shift += period;
+        }
+        return shift;
+    }
+
+    private void drawIndentGuides(@NonNull Canvas canvas,
+                                  int width,
+                                  float startX,
+                                  float top,
+                                  float bottom,
+                                  float spacing,
+                                  int color,
+                                  float offset) {
+        uiPaint.setStyle(Paint.Style.STROKE);
+        uiPaint.setStrokeWidth(2f);
+        uiPaint.setColor(color);
+        for (float x = startX - spacing; x < width + spacing; x += spacing) {
+            float cx = x - offset;
+            canvas.drawLine(cx, top, cx, bottom, uiPaint);
+        }
+        uiPaint.setStyle(Paint.Style.FILL);
+    }
+
+    private void drawHillBand(@NonNull Canvas canvas,
+                              int width,
+                              float baseY,
+                              float bottom,
+                              float period,
+                              float offset,
+                              float amplitude,
+                              int color) {
+        uiPaint.setStyle(Paint.Style.FILL);
+        uiPaint.setColor(color);
+        Path path = new Path();
+        path.moveTo(-width, bottom);
+        for (float x = -period; x <= width + period; x += period / 2f) {
+            float px = x - offset;
+            float py = baseY + (float) Math.sin((px / period) * Math.PI * 2f) * amplitude;
+            path.lineTo(px, py);
+        }
+        path.lineTo(width * 2f, bottom);
+        path.close();
+        canvas.drawPath(path, uiPaint);
+    }
+
+    private void drawGutterRail(@NonNull Canvas canvas,
+                                 int width,
+                                 int height,
+                                 float railWidth,
+                                 int baseColor,
+                                 int lightColor,
+                                 float time,
+                                 float speedFactor,
+                                 float glowStrength) {
+        float bottom = height - SAFE_BOTTOM_PX;
+        uiPaint.setStyle(Paint.Style.FILL);
+        uiPaint.setColor(baseColor);
+        canvas.drawRect(0f, SAFE_TOP_PX, railWidth, bottom, uiPaint);
+
+        uiPaint.setColor(Color.parseColor("#252526"));
+        float verticalOffset = computeLoopOffset(time, BASE_SCROLL_SPEED * speedFactor, railWidth * 0.6f);
+        canvas.drawRect(verticalOffset - railWidth * 0.25f, SAFE_TOP_PX,
+                verticalOffset - railWidth * 0.25f + 3f, bottom, uiPaint);
+
+        float blink = (float) ((Math.sin(time * Math.PI / 1.5f) + 1f) * 0.5f);
+        int alpha = (int) (80 + 120 * blink * glowStrength);
+        uiPaint.setColor(Color.argb(alpha, Color.red(lightColor), Color.green(lightColor), Color.blue(lightColor)));
+        float spacing = 68f;
+        for (float y = SAFE_TOP_PX + 48f; y < bottom - 24f; y += spacing) {
+            float wobble = (float) Math.sin(time * 3f + y * 0.05f) * 2f;
+            canvas.drawCircle(railWidth * 0.55f + wobble, y, railWidth * 0.26f, uiPaint);
+        }
+    }
+
+    private void drawMinimapColumn(@NonNull Canvas canvas,
+                                   int width,
+                                   int height,
+                                   int baseColor,
+                                   int accentColor,
+                                   int glowColor,
+                                   float time,
+                                   float shimmerSpeed) {
+        float minimapWidth = Math.max(18f, width * 0.028f);
+        float left = width - minimapWidth - width * 0.02f;
+        RectF column = new RectF(left, SAFE_TOP_PX + 16f,
+                left + minimapWidth, height - SAFE_BOTTOM_PX - 16f);
+        uiPaint.setStyle(Paint.Style.FILL);
+        uiPaint.setColor(baseColor);
+        canvas.drawRoundRect(column, 18f, 18f, uiPaint);
+
+        uiPaint.setStyle(Paint.Style.STROKE);
+        uiPaint.setStrokeWidth(3f);
+        uiPaint.setColor(accentColor);
+        canvas.drawRoundRect(new RectF(column.left + 4f, column.top + 6f,
+                column.right - 4f, column.bottom - 6f), 16f, 16f, uiPaint);
+
+        uiPaint.setStyle(Paint.Style.FILL);
+        float bandHeight = 22f;
+        float offset = computeLoopOffset(time, BASE_SCROLL_SPEED * shimmerSpeed, bandHeight * 2f);
+        uiPaint.setColor(glowColor);
+        uiPaint.setAlpha(160);
+        for (float y = column.top - bandHeight; y < column.bottom + bandHeight; y += bandHeight * 2f) {
+            float top = y - offset;
+            canvas.drawRect(column.left + 6f, top,
+                    column.right - 6f, top + bandHeight * 0.6f, uiPaint);
+        }
+        uiPaint.setAlpha(255);
+    }
+
+    private void drawTiles(@NonNull Canvas canvas, @NonNull LevelModel level) {
         int tileWidth = level.getTileWidth();
         int tileHeight = level.getTileHeight();
-        int viewWidth = canvas.getWidth();
-        int viewHeight = canvas.getHeight();
+        float scale = currentScale > 0f ? currentScale : 1f;
+        float viewWidthWorld = canvas.getWidth() / scale;
+        float viewHeightWorld = canvas.getHeight() / scale;
         int startX = Math.max(0, (int) Math.floor(cameraX / tileWidth));
-        int endX = Math.min(level.getWidth() - 1, (int) Math.ceil((cameraX + viewWidth) / tileWidth));
-        int endY = Math.min(level.getHeight() - 1, (int) Math.ceil((viewHeight) / tileHeight));
+        int endX = Math.min(level.getWidth() - 1, (int) Math.ceil((cameraX + viewWidthWorld) / tileWidth));
+        int startY = Math.max(0, (int) Math.floor(cameraY / tileHeight));
+        int endY = Math.min(level.getHeight() - 1, (int) Math.ceil((cameraY + viewHeightWorld) / tileHeight));
 
         for (int x = startX; x <= endX; x++) {
-            for (int y = 0; y <= endY; y++) {
+            for (int y = startY; y <= endY; y++) {
                 int gid = level.getTileLayer().getTileId(x, y);
                 if (gid <= 0) {
                     continue;
                 }
-                int index = gid - 1;
-                int srcX = (index % tilesetColumns) * tileWidth;
-                int srcY = (index / tilesetColumns) * tileHeight;
-                srcRect.set(srcX, srcY, srcX + tileWidth, srcY + tileHeight);
-                int screenX = (int) (x * tileWidth - cameraX);
-                int screenY = y * tileHeight;
-                dstRect.set(screenX, screenY, screenX + tileWidth, screenY + tileHeight);
-                canvas.drawBitmap(tileset, srcRect, dstRect, null);
+                float left = (x * tileWidth - cameraX) * scale;
+                float top = (y * tileHeight - cameraY) * scale;
+                float right = left + tileWidth * scale;
+                float bottom = top + tileHeight * scale;
+
+                if (tileset != null && tilesetColumns > 0) {
+                    int index = gid - 1;
+                    int srcX = (index % tilesetColumns) * tileWidth;
+                    int srcY = (index / tilesetColumns) * tileHeight;
+                    srcRect.set(srcX, srcY, srcX + tileWidth, srcY + tileHeight);
+                    dstRect.set(Math.round(left), Math.round(top), Math.round(right), Math.round(bottom));
+                    canvas.drawBitmap(tileset, srcRect, dstRect, null);
+                } else {
+                    drawFallbackTile(canvas, gid, left, top, right, bottom);
+                }
             }
         }
     }
 
+    private void drawFallbackTile(@NonNull Canvas canvas,
+                                   int gid,
+                                   float left,
+                                   float top,
+                                   float right,
+                                   float bottom) {
+        tempRectF.set(left, top, right, bottom);
+        float width = tempRectF.width();
+        float height = tempRectF.height();
+        float radius = Math.min(width, height) * 0.16f;
+        switch (gid) {
+            case 1: // Editor block
+                tileFallbackPaint.setColor(Color.parseColor("#1E1E1E"));
+                canvas.drawRoundRect(tempRectF, radius, radius, tileFallbackPaint);
+                tileFallbackPaint.setColor(Color.parseColor("#2D2D30"));
+                canvas.drawRect(tempRectF.left, tempRectF.top,
+                        tempRectF.right, tempRectF.top + height * 0.18f, tileFallbackPaint);
+                tileFallbackPaint.setColor(Color.parseColor("#3C3C3C"));
+                canvas.drawRect(tempRectF.left, tempRectF.top + height * 0.18f,
+                        tempRectF.left + width * 0.2f, tempRectF.bottom, tileFallbackPaint);
+                tileFallbackPaint.setColor(Color.parseColor("#252526"));
+                canvas.drawRect(tempRectF.left + width * 0.22f, tempRectF.top + height * 0.22f,
+                        tempRectF.right - width * 0.08f, tempRectF.top + height * 0.42f, tileFallbackPaint);
+                break;
+            case 2: // Terminal block
+                tileFallbackPaint.setColor(Color.parseColor("#252526"));
+                canvas.drawRoundRect(tempRectF, radius, radius, tileFallbackPaint);
+                tileFallbackPaint.setColor(Color.parseColor("#0E639C"));
+                float indicatorRadius = Math.min(width, height) * 0.12f;
+                canvas.drawCircle(tempRectF.left + indicatorRadius * 1.8f,
+                        tempRectF.top + indicatorRadius * 1.8f, indicatorRadius, tileFallbackPaint);
+                tileFallbackPaint.setColor(Color.parseColor("#3C3C3C"));
+                canvas.drawRect(tempRectF.left, tempRectF.top,
+                        tempRectF.right, tempRectF.top + height * 0.18f, tileFallbackPaint);
+                tileFallbackPaint.setColor(Color.parseColor("#1F1F1F"));
+                canvas.drawRect(tempRectF.left + width * 0.12f, tempRectF.top + height * 0.26f,
+                        tempRectF.right - width * 0.12f, tempRectF.bottom - height * 0.22f, tileFallbackPaint);
+                break;
+            case 3: // Debug block
+                tileFallbackPaint.setColor(Color.parseColor("#373277"));
+                canvas.drawRoundRect(tempRectF, radius, radius, tileFallbackPaint);
+                tileFallbackPaint.setColor(Color.parseColor("#1E1E1E"));
+                float inset = Math.min(width, height) * 0.18f;
+                canvas.drawRoundRect(tempRectF.left + inset, tempRectF.top + inset,
+                        tempRectF.right - inset, tempRectF.bottom - inset, radius, radius, tileFallbackPaint);
+                float dotRadius = Math.min(width, height) * 0.12f;
+                tileFallbackPaint.setColor(Color.parseColor("#F14C4C"));
+                canvas.drawCircle(tempRectF.left + width * 0.25f, tempRectF.centerY(), dotRadius, tileFallbackPaint);
+                tileFallbackPaint.setColor(Color.parseColor("#3794FF"));
+                canvas.drawCircle(tempRectF.right - width * 0.25f, tempRectF.centerY(), dotRadius, tileFallbackPaint);
+                break;
+            default:
+                tileFallbackPaint.setColor(Color.parseColor("#1E1E1E"));
+                canvas.drawRoundRect(tempRectF, radius, radius, tileFallbackPaint);
+                break;
+        }
+    }
+
     private void drawEntities(@NonNull Canvas canvas, @NonNull LevelModel level) {
-        entityPaint.setColor(Color.argb(160, 255, 255, 255));
+        float scale = currentScale > 0f ? currentScale : 1f;
         for (LevelModel.Entity entity : level.getEntities()) {
-            float width = level.getTileWidth();
-            float height = level.getTileHeight();
-            float left = entity.getX() - cameraX;
-            float top = entity.getY() - height;
-            RectF rect = new RectF(left, top, left + width, top + height);
-            canvas.drawRoundRect(rect, 6f, 6f, entityPaint);
-            String label = entity.getType();
-            canvas.drawText(label, left + 4f, top + height / 2f, textPaint);
+            String type = entity.getType();
+            if (type == null || "spawn".equalsIgnoreCase(type)) {
+                continue;
+            }
+            float screenX = (entity.getX() - cameraX) * scale;
+            float screenY = (entity.getY() - cameraY) * scale;
+            float tileWidth = level.getTileWidth() * scale;
+            float tileHeight = level.getTileHeight() * scale;
+            String lowerType = type.toLowerCase(Locale.US);
+            if (lowerType.contains("coin")) {
+                drawCoinEntity(canvas, screenX, screenY, tileWidth);
+            } else if (lowerType.contains("spike")) {
+                drawSpikeEntity(canvas, screenX, screenY, tileWidth, tileHeight);
+            } else if (lowerType.contains("flag")) {
+                drawFlagEntity(canvas, screenX, screenY, tileWidth, tileHeight);
+            } else if (lowerType.contains("enemy")) {
+                drawEnemyEntity(canvas, screenX, screenY, tileWidth, tileHeight);
+            } else {
+                drawGenericEntity(canvas, screenX, screenY, tileWidth, tileHeight, type);
+            }
         }
     }
 
     private void drawPlayer(@NonNull Canvas canvas) {
         RectF bounds = player.getBounds();
-        float left = bounds.left - cameraX;
-        float right = bounds.right - cameraX;
-        float top = bounds.top;
-        float bottom = bounds.bottom;
-        entityPaint.setColor(Color.rgb(255, 120, 64));
-        canvas.drawRoundRect(new RectF(left, top, right, bottom), 8f, 8f, entityPaint);
+        float left = worldToScreenX(bounds.left);
+        float right = worldToScreenX(bounds.right);
+        float top = worldToScreenY(bounds.top);
+        float bottom = worldToScreenY(bounds.bottom);
+        drawRobotSprite(canvas, left, top, right, bottom, player.facingRight);
     }
 
     private void drawHud(@NonNull Canvas canvas, @NonNull LevelModel level) {
+        String worldName = currentWorldInfo != null ? currentWorldInfo.getName()
+                : String.format(Locale.US, "World %d", currentWorldNumber);
+        String header = String.format(Locale.US, "%s  (W%d-%d)", worldName, currentWorldNumber, currentStage);
+        canvas.drawText(header, 20f, SAFE_TOP_PX - 18f, textPaint);
         String text = String.format(Locale.US, "x=%1$.0f  y=%2$.0f", player.x, player.y);
-        canvas.drawText(text, 20f, 30f, textPaint);
-        String tilesetInfo = level.getTilesetAssetPath();
-        canvas.drawText(tilesetInfo, 20f, 60f, textPaint);
+        canvas.drawText(text, 20f, SAFE_TOP_PX + 12f, textPaint);
+        if (tileset != null && level.getTilesetAssetPath() != null && !level.getTilesetAssetPath().isEmpty()) {
+            canvas.drawText(level.getTilesetAssetPath(), 20f, SAFE_TOP_PX + 42f, textPaint);
+        }
+    }
+
+    private float worldToScreenX(float worldX) {
+        float scale = currentScale > 0f ? currentScale : 1f;
+        return (worldX - cameraX) * scale;
+    }
+
+    private float worldToScreenY(float worldY) {
+        float scale = currentScale > 0f ? currentScale : 1f;
+        return (worldY - cameraY) * scale;
+    }
+
+    private void drawRobotSprite(@NonNull Canvas canvas,
+                                 float left,
+                                 float top,
+                                 float right,
+                                 float bottom,
+                                 boolean facingRight) {
+        float width = right - left;
+        float height = bottom - top;
+
+        Paint.Style originalStyle = entityPaint.getStyle();
+        int originalColor = entityPaint.getColor();
+        Paint.Align originalAlign = entityPaint.getTextAlign();
+        float originalTextSize = entityPaint.getTextSize();
+        float originalStroke = entityPaint.getStrokeWidth();
+
+        entityPaint.setStyle(Paint.Style.FILL);
+        entityPaint.setColor(Color.parseColor("#4A90E2"));
+        canvas.drawRoundRect(left + width * 0.12f, top + height * 0.12f,
+                right - width * 0.12f, bottom - height * 0.12f, width * 0.18f, width * 0.18f, entityPaint);
+
+        entityPaint.setColor(Color.parseColor("#A1C4FD"));
+        canvas.drawRoundRect(left + width * 0.2f, top + height * 0.06f,
+                right - width * 0.2f, top + height * 0.45f, width * 0.16f, width * 0.16f, entityPaint);
+
+        entityPaint.setColor(Color.parseColor("#0D1B2A"));
+        float eyeY = top + height * 0.24f;
+        float eyeOffset = width * 0.12f * (facingRight ? 1f : -1f);
+        float eyeRadius = Math.max(3f, width * 0.06f);
+        canvas.drawCircle(left + width * 0.5f - eyeOffset, eyeY, eyeRadius, entityPaint);
+        canvas.drawCircle(left + width * 0.5f + eyeOffset, eyeY, eyeRadius, entityPaint);
+
+        entityPaint.setColor(Color.parseColor("#3D7ECC"));
+        float armLength = width * 0.38f;
+        float armHeight = height * 0.08f;
+        float armTop = top + height * 0.38f;
+        if (facingRight) {
+            canvas.drawRoundRect(right - width * 0.12f, armTop,
+                    right + armLength, armTop + armHeight, armHeight, armHeight, entityPaint);
+            canvas.drawRoundRect(left - armLength, armTop,
+                    left + width * 0.12f, armTop + armHeight, armHeight, armHeight, entityPaint);
+        } else {
+            canvas.drawRoundRect(left - armLength, armTop,
+                    left + width * 0.12f, armTop + armHeight, armHeight, armHeight, entityPaint);
+            canvas.drawRoundRect(right - width * 0.12f, armTop,
+                    right + armLength, armTop + armHeight, armHeight, armHeight, entityPaint);
+        }
+
+        entityPaint.setColor(Color.parseColor("#344E9A"));
+        float footHeight = height * 0.14f;
+        canvas.drawRoundRect(left + width * 0.08f, bottom - footHeight,
+                left + width * 0.42f, bottom, footHeight * 0.6f, footHeight * 0.6f, entityPaint);
+        canvas.drawRoundRect(right - width * 0.42f, bottom - footHeight,
+                right - width * 0.08f, bottom, footHeight * 0.6f, footHeight * 0.6f, entityPaint);
+
+        entityPaint.setColor(Color.parseColor("#0D1B2A"));
+        entityPaint.setTextAlign(Paint.Align.CENTER);
+        entityPaint.setTextSize(height * 0.22f);
+        canvas.drawText("</>", left + width * 0.5f, bottom - height * 0.32f, entityPaint);
+
+        entityPaint.setStyle(originalStyle);
+        entityPaint.setColor(originalColor);
+        entityPaint.setTextAlign(originalAlign);
+        entityPaint.setTextSize(originalTextSize);
+        entityPaint.setStrokeWidth(originalStroke);
+    }
+
+    private void drawCoinEntity(@NonNull Canvas canvas, float centerX, float centerY, float tileSize) {
+        Paint.Style originalStyle = entityPaint.getStyle();
+        int originalColor = entityPaint.getColor();
+        float originalStroke = entityPaint.getStrokeWidth();
+
+        float size = tileSize * 0.6f;
+        float wobble = (float) Math.sin(animationTimer * 6f + centerX * 0.01f) * tileSize * 0.06f;
+        float top = centerY - size / 2f + wobble;
+        float bottom = centerY + size / 2f + wobble;
+
+        entityPaint.setStyle(Paint.Style.STROKE);
+        entityPaint.setStrokeWidth(Math.max(2f, tileSize * 0.08f));
+        entityPaint.setColor(Color.parseColor("#FFD166"));
+        RectF leftArc = new RectF(centerX - size, top, centerX - size * 0.2f, bottom);
+        RectF rightArc = new RectF(centerX + size * 0.2f, top, centerX + size, bottom);
+        canvas.drawArc(leftArc, 110, 140, false, entityPaint);
+        canvas.drawArc(rightArc, -70, 140, false, entityPaint);
+
+        entityPaint.setStyle(originalStyle);
+        entityPaint.setColor(originalColor);
+        entityPaint.setStrokeWidth(originalStroke);
+    }
+
+    private void drawSpikeEntity(@NonNull Canvas canvas,
+                                 float centerX,
+                                 float baseY,
+                                 float tileWidth,
+                                 float tileHeight) {
+        Paint.Style originalStyle = entityPaint.getStyle();
+        int originalColor = entityPaint.getColor();
+        float originalStroke = entityPaint.getStrokeWidth();
+
+        Path path = new Path();
+        float halfWidth = tileWidth * 0.45f;
+        path.moveTo(centerX - halfWidth, baseY);
+        path.lineTo(centerX, baseY - tileHeight * 0.9f);
+        path.lineTo(centerX + halfWidth, baseY);
+        path.close();
+
+        entityPaint.setStyle(Paint.Style.FILL);
+        entityPaint.setColor(Color.parseColor("#C94E4E"));
+        canvas.drawPath(path, entityPaint);
+
+        entityPaint.setStyle(Paint.Style.STROKE);
+        entityPaint.setStrokeWidth(Math.max(2f, tileWidth * 0.05f));
+        entityPaint.setColor(Color.parseColor("#FCD7D7"));
+        canvas.drawPath(path, entityPaint);
+
+        entityPaint.setStyle(originalStyle);
+        entityPaint.setColor(originalColor);
+        entityPaint.setStrokeWidth(originalStroke);
+    }
+
+    private void drawFlagEntity(@NonNull Canvas canvas,
+                                float baseX,
+                                float baseY,
+                                float tileWidth,
+                                float tileHeight) {
+        Paint.Style originalStyle = entityPaint.getStyle();
+        int originalColor = entityPaint.getColor();
+        float originalStroke = entityPaint.getStrokeWidth();
+
+        float poleHeight = tileHeight * 3.2f;
+        float poleTop = baseY - poleHeight;
+
+        entityPaint.setStyle(Paint.Style.STROKE);
+        entityPaint.setStrokeWidth(Math.max(2f, tileWidth * 0.08f));
+        entityPaint.setColor(Color.parseColor("#C7CDD6"));
+        canvas.drawLine(baseX, poleTop, baseX, baseY, entityPaint);
+
+        entityPaint.setStyle(Paint.Style.FILL);
+        entityPaint.setColor(Color.parseColor("#4FC1FF"));
+        float flagWidth = tileWidth * 1.4f;
+        float flagHeight = tileHeight * 0.9f;
+        Path flag = new Path();
+        flag.moveTo(baseX, poleTop + flagHeight * 0.3f);
+        flag.lineTo(baseX + flagWidth, poleTop + flagHeight * 0.6f);
+        flag.lineTo(baseX, poleTop + flagHeight);
+        flag.close();
+        canvas.drawPath(flag, entityPaint);
+
+        entityPaint.setStyle(originalStyle);
+        entityPaint.setColor(originalColor);
+        entityPaint.setStrokeWidth(originalStroke);
+    }
+
+    private void drawEnemyEntity(@NonNull Canvas canvas,
+                                 float centerX,
+                                 float baseY,
+                                 float tileWidth,
+                                 float tileHeight) {
+        Paint.Style originalStyle = entityPaint.getStyle();
+        int originalColor = entityPaint.getColor();
+        float originalStroke = entityPaint.getStrokeWidth();
+
+        float bodyWidth = tileWidth * 1.1f;
+        float bodyHeight = tileHeight * 0.9f;
+        RectF body = new RectF(centerX - bodyWidth / 2f, baseY - bodyHeight,
+                centerX + bodyWidth / 2f, baseY);
+        entityPaint.setStyle(Paint.Style.FILL);
+        entityPaint.setColor(Color.parseColor("#BF6C32"));
+        canvas.drawRoundRect(body, bodyWidth * 0.3f, bodyWidth * 0.3f, entityPaint);
+
+        entityPaint.setColor(Color.parseColor("#FCEBD2"));
+        float eyeRadius = Math.max(2f, tileWidth * 0.12f);
+        canvas.drawCircle(centerX - eyeRadius * 1.6f, body.top + bodyHeight * 0.35f, eyeRadius, entityPaint);
+        canvas.drawCircle(centerX + eyeRadius * 1.6f, body.top + bodyHeight * 0.35f, eyeRadius, entityPaint);
+
+        entityPaint.setColor(Color.parseColor("#2D160C"));
+        float mouthWidth = bodyWidth * 0.5f;
+        float mouthHeight = bodyHeight * 0.12f;
+        canvas.drawRect(centerX - mouthWidth / 2f, body.top + bodyHeight * 0.65f,
+                centerX + mouthWidth / 2f, body.top + bodyHeight * 0.65f + mouthHeight, entityPaint);
+
+        entityPaint.setStyle(originalStyle);
+        entityPaint.setColor(originalColor);
+        entityPaint.setStrokeWidth(originalStroke);
+    }
+
+    private void drawGenericEntity(@NonNull Canvas canvas,
+                                   float centerX,
+                                   float baseY,
+                                   float tileWidth,
+                                   float tileHeight,
+                                   @NonNull String label) {
+        Paint.Style originalStyle = entityPaint.getStyle();
+        int originalColor = entityPaint.getColor();
+
+        entityPaint.setStyle(Paint.Style.FILL);
+        entityPaint.setColor(Color.argb(140, 255, 255, 255));
+        RectF rect = new RectF(centerX - tileWidth * 0.5f, baseY - tileHeight,
+                centerX + tileWidth * 0.5f, baseY);
+        canvas.drawRoundRect(rect, tileWidth * 0.2f, tileWidth * 0.2f, entityPaint);
+
+        entityPaint.setStyle(originalStyle);
+        entityPaint.setColor(originalColor);
+
+        float originalTextSize = textPaint.getTextSize();
+        int originalTextColor = textPaint.getColor();
+        textPaint.setTextSize(tileHeight * 0.35f);
+        textPaint.setColor(Color.WHITE);
+        canvas.drawText(label, rect.left + tileWidth * 0.08f, rect.top + tileHeight * 0.6f, textPaint);
+        textPaint.setTextSize(originalTextSize);
+        textPaint.setColor(originalTextColor);
     }
 
     public void onHostResume() {
         if (surfaceReady) {
             startRenderThread();
         }
+        audioManager.onResume();
     }
 
     public void onHostPause() {
+        audioManager.onPause();
         stopRenderThread();
     }
 
@@ -410,6 +1027,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             tileset.recycle();
             tileset = null;
         }
+        audioManager.release();
     }
 
     public void handleButtonTouch(@NonNull Control control, @NonNull MotionEvent event) {
@@ -431,6 +1049,16 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         }
     }
 
+    private float clamp(float value, float min, float max) {
+        if (value < min) {
+            return min;
+        }
+        if (value > max) {
+            return max;
+        }
+        return value;
+    }
+
     private static final class Player {
         float x;
         float y;
@@ -439,6 +1067,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         float width;
         float height;
         boolean onGround;
+        boolean facingRight = true;
 
         RectF getBounds() {
             float halfWidth = width / 2f;
