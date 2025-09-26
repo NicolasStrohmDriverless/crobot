@@ -155,11 +155,11 @@ public class WorldSelectScene implements Scene {
     private void drawHeader(Canvas canvas) {
         paint.setColor(Color.WHITE);
         paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(surfaceWidth * 0.07f);
+        paint.setTextSize(surfaceWidth * 0.058f);
         canvas.drawText("Programmierer-Schatzkarte", surfaceWidth / 2f, surfaceHeight * 0.13f, paint);
 
         paint.setColor(Color.parseColor("#7FB3FF"));
-        paint.setTextSize(surfaceWidth * 0.038f);
+        paint.setTextSize(surfaceWidth * 0.032f);
         canvas.drawText("Folge der gestrichelten Route zum NullPointer-Nexus", surfaceWidth / 2f, surfaceHeight * 0.19f, paint);
     }
 
@@ -305,18 +305,18 @@ public class WorldSelectScene implements Scene {
         paint.setStyle(Paint.Style.FILL);
         paint.setTextAlign(Paint.Align.CENTER);
         paint.setColor(Color.parseColor("#88C7FF"));
-        paint.setTextSize(cardHeight * 0.16f);
+        paint.setTextSize(cardHeight * 0.14f);
         String label = card.worldInfo.getProgramNumber() >= 9
                 ? "final.class"
                 : "Program " + card.worldInfo.getProgramNumber();
         canvas.drawText(label, centerX, top + cardHeight * 0.28f, paint);
 
         paint.setColor(Color.WHITE);
-        paint.setTextSize(cardHeight * 0.24f);
+        paint.setTextSize(cardHeight * 0.20f);
         canvas.drawText(card.worldInfo.getName(), centerX, top + cardHeight * 0.55f, paint);
 
         paint.setColor(Color.parseColor("#C9E6FF"));
-        paint.setTextSize(cardHeight * 0.18f);
+        paint.setTextSize(cardHeight * 0.15f);
         float textAreaWidth = card.bounds.width() * 0.80f;
         float descStartY = top + cardHeight * 0.70f;
         float lineHeight = paint.getTextSize() * 1.20f;
@@ -324,7 +324,7 @@ public class WorldSelectScene implements Scene {
                 descStartY, textAreaWidth, lineHeight);
 
         paint.setColor(Color.parseColor("#7FB3FF"));
-        paint.setTextSize(cardHeight * 0.17f);
+        paint.setTextSize(cardHeight * 0.14f);
         String cta = isActive ? "tap(); // starten" : "load();";
         canvas.drawText(cta, centerX, Math.min(card.bounds.bottom - cardHeight * 0.12f, descStartY + lineHeight), paint);
     }
@@ -374,7 +374,7 @@ public class WorldSelectScene implements Scene {
         canvas.drawRoundRect(bounds, 24f, 24f, paint);
         paint.setColor(Color.WHITE);
         paint.setTextAlign(Paint.Align.CENTER);
-        paint.setTextSize(bounds.height() * 0.45f);
+        paint.setTextSize(bounds.height() * 0.38f);
         canvas.drawText(text, bounds.centerX(), bounds.centerY() + paint.getTextSize() * 0.3f, paint);
     }
 
@@ -451,11 +451,36 @@ public class WorldSelectScene implements Scene {
         }
 
         float buttonWidth = width * 0.2f;
-        float buttonHeight = height * 0.08f;
-        backButton.set(padding,
-                padding * 0.8f,
-                padding + buttonWidth,
-                padding * 0.8f + buttonHeight);
+        float buttonHeight = height * 0.07f;
+        float buttonLeft = padding * 0.6f;
+        float buttonTop = height - padding - buttonHeight;
+        float buttonBottom = buttonTop + buttonHeight;
+
+        WorldCard lambdaGardensCard = null;
+        for (WorldCard card : worldCards) {
+            if (card.worldInfo.getProgramNumber() == 7) {
+                lambdaGardensCard = card;
+                break;
+            }
+        }
+
+        if (lambdaGardensCard != null) {
+            float minTop = lambdaGardensCard.bounds.bottom + height * 0.02f;
+            if (buttonTop < minTop) {
+                float shift = minTop - buttonTop;
+                buttonTop += shift;
+                buttonBottom += shift;
+            }
+        }
+
+        float maxBottom = height - padding * 0.2f;
+        if (buttonBottom > maxBottom) {
+            float shift = buttonBottom - maxBottom;
+            buttonTop -= shift;
+            buttonBottom -= shift;
+        }
+
+        backButton.set(buttonLeft, buttonTop, buttonLeft + buttonWidth, buttonBottom);
     }
 
     @Override
