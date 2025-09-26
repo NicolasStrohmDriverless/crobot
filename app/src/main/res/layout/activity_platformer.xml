@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:keepScreenOn="true">
+
+    <com.crobot.game.GameView
+        android:id="@+id/platformer_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="Platformer surface" />
+
+    <LinearLayout
+        android:id="@+id/loading_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#66000000"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:visibility="gone">
+
+        <ProgressBar
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            style="@android:style/Widget.ProgressBar.Large" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Loading level..."
+            android:textColor="#FFFFFFFF"
+            android:textSize="18sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:gravity="center_horizontal"
+        android:orientation="horizontal"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/button_left"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:layout_marginEnd="16dp"
+                android:backgroundTint="#AAFFFFFF"
+                android:text="◀"
+                android:textSize="28sp" />
+
+            <Button
+                android:id="@+id/button_right"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:backgroundTint="#AAFFFFFF"
+                android:text="▶"
+                android:textSize="28sp" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <Button
+            android:id="@+id/button_jump"
+            android:layout_width="120dp"
+            android:layout_height="72dp"
+            android:backgroundTint="#AAFFFFFF"
+            android:text="JUMP"
+            android:textSize="20sp" />
+    </LinearLayout>
+</FrameLayout>

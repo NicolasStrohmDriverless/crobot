@@ -9,6 +9,7 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.crobot.game.ui.MenuIntegration;
 import com.example.robotparkour.core.GameView;
 
 /**
@@ -29,6 +30,7 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
         gameView = findViewById(R.id.game_view);
+        MenuIntegration.registerHost(this);
 
         backPressedCallback = new OnBackPressedCallback(true) {
             @Override
@@ -64,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
         if (gameView != null) {
             gameView.releaseResources();
         }
+        MenuIntegration.unregisterHost(this);
         if (backPressedCallback != null) {
             backPressedCallback.remove();
             backPressedCallback = null;

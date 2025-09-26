@@ -6,6 +6,7 @@ import android.graphics.Canvas;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 
+import com.crobot.game.ui.MenuIntegration;
 import com.example.robotparkour.audio.GameAudioManager;
 import com.example.robotparkour.scene.GameOverScene;
 import com.example.robotparkour.scene.GameScene;
@@ -101,6 +102,10 @@ public class SceneManager {
     public void startNewGame() {
         if (selectedWorld == null) {
             selectedWorld = new WorldInfo(1, "Pointer Plains", "Startwelt, leicht & freundlich");
+        }
+        int worldNumber = selectedWorld.getProgramNumber();
+        if (MenuIntegration.launchGameActivity(worldNumber, 1)) {
+            return;
         }
         if (gameScene != null) {
             gameScene.resetForNewRun();

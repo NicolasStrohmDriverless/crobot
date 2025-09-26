@@ -1,0 +1,68 @@
+{
+  "tileWidth": 16,
+  "tileHeight": 16,
+  "height": 15,
+  "tileset": "tilesets/platformer16.png",
+  "solidGids": [
+    1,
+    2,
+    3,
+    5,
+    6,
+    7
+  ],
+  "columns": [
+    {
+      "repeat": 48,
+      "rows": [
+        {
+          "from": 14,
+          "to": 14,
+          "gid": 1
+        }
+      ]
+    },
+    {
+      "repeat": 8,
+      "rows": [
+        {
+          "from": 12,
+          "to": 14,
+          "gid": 1
+        }
+      ]
+    },
+    {
+      "repeat": 8,
+      "rows": [
+        {
+          "from": 10,
+          "to": 14,
+          "gid": 1
+        }
+      ]
+    },
+    {
+      "repeat": 64,
+      "rows": [
+        {
+          "from": 14,
+          "to": 14,
+          "gid": 1
+        }
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "type": "coin",
+      "x": 96,
+      "y": 160
+    },
+    {
+      "type": "enemy_goomba",
+      "x": 320,
+      "y": 208
+    }
+  ]
+}

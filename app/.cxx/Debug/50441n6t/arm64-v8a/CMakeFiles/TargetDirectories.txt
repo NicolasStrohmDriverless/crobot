@@ -1,0 +1,3 @@
+/home/nico/UNI/Android Programmierung/crobot/app/.cxx/Debug/50441n6t/arm64-v8a/CMakeFiles/crobot_native.dir
+/home/nico/UNI/Android Programmierung/crobot/app/.cxx/Debug/50441n6t/arm64-v8a/CMakeFiles/edit_cache.dir
+/home/nico/UNI/Android Programmierung/crobot/app/.cxx/Debug/50441n6t/arm64-v8a/CMakeFiles/rebuild_cache.dir
