@@ -22,25 +22,19 @@ import com.example.robotparkour.entity.Robot;
 import com.example.robotparkour.entity.Spike;
 import com.example.robotparkour.entity.Tile;
 import com.example.robotparkour.level.Level;
+import com.example.robotparkour.level.LevelLibrary;
 import com.example.robotparkour.ui.Camera2D;
 import com.example.robotparkour.ui.HudOverlay;
 import com.example.robotparkour.ui.VirtualButton;
 import com.example.robotparkour.util.GameResult;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
  * Core gameplay scene that manages entities, physics, and rendering.
  */
 public class GameScene implements Scene {
-
-    private static final String[] LEVEL_DATA = new String[] {
-            "................................",
-            "..............C.................",
-            "..........GGGGGGG...............",
-            "..R......................F......",
-            "GGGGGGGGGBBBBQQQGGGGGGGGGGGGGGG"
-    };
 
     private static final int INITIAL_LIVES = 3;
 
@@ -54,12 +48,13 @@ public class GameScene implements Scene {
     private final VirtualButton rightButton = new VirtualButton("→");
     private final VirtualButton jumpButton = new VirtualButton("⤒");
 
-    private final Level level;
-    private final Robot robot;
-    private final List<Tile> tiles;
-    private final List<Coin> coins;
-    private final List<Spike> spikes;
-    private final Flag flag;
+    private Level level;
+    private Robot robot;
+    private List<Tile> tiles = Collections.emptyList();
+    private List<Coin> coins = Collections.emptyList();
+    private List<Spike> spikes = Collections.emptyList();
+    private Flag flag;
+    private String activeWorldName = "";
 
     private float elapsedSeconds;
     private int collectedCoins;
@@ -83,14 +78,7 @@ public class GameScene implements Scene {
     public GameScene(Context context, SceneManager sceneManager) {
         this.sceneManager = sceneManager;
         this.audioManager = sceneManager.getAudioManager();
-        this.level = Level.fromStringMap(LEVEL_DATA, Level.TILE_SIZE);
-        float robotWidth = Level.TILE_SIZE * 0.8f;
-        float robotHeight = Level.TILE_SIZE * 0.95f;
-        this.robot = new Robot(level.getSpawnX(), level.getSpawnY() - (robotHeight - Level.TILE_SIZE), robotWidth, robotHeight);
-        this.tiles = level.getTiles();
-        this.coins = level.getCoins();
-        this.spikes = level.getSpikes();
-        this.flag = level.getFlag();
+        ensureLevelForSelectedWorld();
         resetForNewRun();
     }
 
@@ -100,6 +88,7 @@ public class GameScene implements Scene {
     }
 
     public void resetForNewRun() {
+        ensureLevelForSelectedWorld();
         audioManager.setMusicTrack(WorldMusicLibrary.getTrackFor(sceneManager.getSelectedWorld()));
         elapsedSeconds = 0f;
         collectedCoins = 0;
@@ -110,9 +99,11 @@ public class GameScene implements Scene {
         rightKeyDown = false;
         jumpKeyDown = false;
         jumpButtonPreviouslyPressed = false;
-        robot.setLives(INITIAL_LIVES);
-        robot.setSpawn(level.getSpawnX(), level.getSpawnY() - (robot.getBounds().height() - Level.TILE_SIZE));
-        robot.resetToSpawn();
+        if (robot != null) {
+            robot.setLives(INITIAL_LIVES);
+            robot.setSpawn(level.getSpawnX(), level.getSpawnY() - (robot.getBounds().height() - Level.TILE_SIZE));
+            robot.resetToSpawn();
+        }
         for (Coin coin : coins) {
             coin.reset();
         }
@@ -120,16 +111,45 @@ public class GameScene implements Scene {
             flag.reset();
         }
         audioManager.startMusic();
-        if (surfaceWidth > 0) {
+        if (robot != null && surfaceWidth > 0) {
             camera.snapTo(Math.max(0f, robot.getX() - surfaceWidth / 2f), 0f);
         } else {
             camera.snapTo(0f, 0f);
         }
     }
 
+    private void ensureLevelForSelectedWorld() {
+        WorldInfo selectedWorld = resolveSelectedWorld();
+        String worldName = selectedWorld.getName();
+        if (level != null && robot != null && worldName.equals(activeWorldName)) {
+            return;
+        }
+        activeWorldName = worldName;
+        String[] layout = LevelLibrary.getLevelData(selectedWorld);
+        level = Level.fromStringMap(layout, Level.TILE_SIZE);
+        tiles = level.getTiles();
+        coins = level.getCoins();
+        spikes = level.getSpikes();
+        flag = level.getFlag();
+        float robotWidth = Level.TILE_SIZE * 0.8f;
+        float robotHeight = Level.TILE_SIZE * 0.95f;
+        robot = new Robot(level.getSpawnX(), level.getSpawnY() - (robotHeight - Level.TILE_SIZE), robotWidth, robotHeight);
+        float worldHeight = Math.max(level.getPixelHeight(), surfaceHeight > 0 ? surfaceHeight : level.getPixelHeight());
+        camera.setWorldSize(level.getPixelWidth(), worldHeight);
+    }
+
+    private WorldInfo resolveSelectedWorld() {
+        WorldInfo selectedWorld = sceneManager.getSelectedWorld();
+        if (selectedWorld == null) {
+            selectedWorld = new WorldInfo(1, "Pointer Plains", "Startwelt, leicht & freundlich");
+        }
+        return selectedWorld;
+    }
+
     @Override
     public void onEnter() {
         running = true;
+        ensureLevelForSelectedWorld();
         audioManager.setMusicTrack(WorldMusicLibrary.getTrackFor(sceneManager.getSelectedWorld()));
         audioManager.startMusic();
     }
@@ -143,6 +163,9 @@ public class GameScene implements Scene {
     public void update(float deltaSeconds) {
         parallaxTimer += deltaSeconds;
         if (!running) {
+            return;
+        }
+        if (level == null || robot == null) {
             return;
         }
         elapsedSeconds += deltaSeconds;
@@ -1269,6 +1292,9 @@ public class GameScene implements Scene {
     }
 
     private void drawLevel(Canvas canvas) {
+        if (robot == null) {
+            return;
+        }
         for (Tile tile : tiles) {
             tile.draw(canvas, worldPaint);
         }
@@ -1371,7 +1397,10 @@ public class GameScene implements Scene {
         surfaceWidth = width;
         surfaceHeight = height;
         camera.setViewport(width, height);
-        camera.setWorldSize(level.getPixelWidth(), Math.max(level.getPixelHeight(), height));
+        ensureLevelForSelectedWorld();
+        if (level != null) {
+            camera.setWorldSize(level.getPixelWidth(), Math.max(level.getPixelHeight(), height));
+        }
 
         float buttonSize = height * 0.18f;
         float margin = 32f;
