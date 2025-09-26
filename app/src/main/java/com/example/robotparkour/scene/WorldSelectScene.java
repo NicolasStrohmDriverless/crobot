@@ -24,19 +24,29 @@ import java.util.List;
  */
 public class WorldSelectScene implements Scene {
 
+    private static final int GRID_COLUMNS = 3;
+    private static final int GRID_ROWS = 3;
+    private static final float CARD_ASPECT_RATIO = 0.88f;
+    private static final float CELL_INNER_PADDING = 0.18f;
+
     private static final class WorldCard {
         final WorldInfo worldInfo;
         final RectF bounds = new RectF();
-        final float relX;
-        final float relY;
+        final int column;
+        final int row;
+        final float offsetX;
+        final float offsetY;
         final float sizeMultiplier;
         float centerX;
         float centerY;
 
-        WorldCard(WorldInfo worldInfo, float relX, float relY, float sizeMultiplier) {
+        WorldCard(WorldInfo worldInfo, int column, int row,
+                  float offsetX, float offsetY, float sizeMultiplier) {
             this.worldInfo = worldInfo;
-            this.relX = relX;
-            this.relY = relY;
+            this.column = column;
+            this.row = row;
+            this.offsetX = offsetX;
+            this.offsetY = offsetY;
             this.sizeMultiplier = sizeMultiplier;
         }
     }
@@ -62,55 +72,55 @@ public class WorldSelectScene implements Scene {
                         1,
                         "Pointer Plains",
                         "Startwelt, leicht & freundlich"),
-                0.16f, 0.40f, 1.12f));
+                0, 0, -0.12f, 0.08f, 1.08f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         2,
                         "Template Temple",
                         "komplex, verschachtelt"),
-                0.30f, 0.25f, 1.08f));
+                1, 0, -0.18f, -0.05f, 1.04f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         3,
                         "Namespace Nebula",
                         "spacey, schwebend"),
-                0.52f, 0.18f, 1.02f));
+                2, 0, 0.10f, 0.04f, 1.02f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         4,
                         "Exception Volcano",
                         "heiß, leicht bedrohlich – kein Boss, nur Spannung"),
-                0.76f, 0.30f, 1.12f));
+                2, 1, 0.14f, -0.12f, 1.08f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         5,
                         "STL City",
                         "geschäftig, groovy"),
-                0.84f, 0.50f, 1.08f));
+                2, 2, 0.12f, 0.10f, 1.04f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         6,
                         "Heap Caverns",
                         "dunkel, hohl, vorsichtig"),
-                0.64f, 0.68f, 1.10f));
+                1, 2, 0.16f, 0.06f, 1.06f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         7,
                         "Lambda Gardens",
                         "verspielt, naturhaft, \"funky nerdy\""),
-                0.38f, 0.74f, 1.16f));
+                0, 2, -0.08f, -0.10f, 1.14f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         8,
                         "Multithread Foundry",
                         "antriebsstark, mechanisch"),
-                0.22f, 0.60f, 1.02f));
+                0, 1, -0.14f, 0.06f, 1.00f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         9,
                         "NullPointer-Nexus",
                         "Der Kernel-Kerker"),
-                0.48f, 0.84f, 1.40f));
+                1, 1, 0.02f, 0.12f, 1.26f));
     }
 
     @Override
@@ -406,15 +416,31 @@ public class WorldSelectScene implements Scene {
         surfaceHeight = height;
 
         float padding = width * 0.08f;
-        float baseSize = Math.min(width, height) * 0.20f;
         float usableWidth = width - padding * 2f;
         float usableHeight = height - padding * 2f;
 
+        float cellWidth = usableWidth / GRID_COLUMNS;
+        float cellHeight = usableHeight / GRID_ROWS;
+        float baseCardWidth = Math.min(cellWidth, cellHeight) * (1f - CELL_INNER_PADDING);
+
         for (WorldCard card : worldCards) {
-            float centerX = padding + card.relX * usableWidth;
-            float centerY = padding + card.relY * usableHeight;
-            float cardWidth = baseSize * card.sizeMultiplier;
-            float cardHeight = cardWidth * 0.88f;
+            float cellCenterX = padding + cellWidth * (card.column + 0.5f);
+            float cellCenterY = padding + cellHeight * (card.row + 0.5f);
+
+            float centerX = cellCenterX + card.offsetX * cellWidth * 0.32f;
+            float centerY = cellCenterY + card.offsetY * cellHeight * 0.32f;
+
+            float cardWidth = baseCardWidth * card.sizeMultiplier;
+            float cardHeight = cardWidth * CARD_ASPECT_RATIO;
+
+            float maxWidth = cellWidth * (1f - CELL_INNER_PADDING * 0.5f);
+            float maxHeight = cellHeight * (1f - CELL_INNER_PADDING * 0.4f);
+            float widthScale = Math.min(1f, maxWidth / cardWidth);
+            float heightScale = Math.min(1f, maxHeight / cardHeight);
+            float scale = Math.min(widthScale, heightScale);
+            cardWidth *= scale;
+            cardHeight *= scale;
+
             card.centerX = centerX;
             card.centerY = centerY;
             card.bounds.set(
