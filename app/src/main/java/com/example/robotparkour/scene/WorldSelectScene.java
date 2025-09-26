@@ -15,6 +15,7 @@ import com.example.robotparkour.core.Scene;
 import com.example.robotparkour.core.SceneManager;
 import com.example.robotparkour.core.SceneType;
 import com.example.robotparkour.core.WorldInfo;
+import com.example.robotparkour.storage.WorldCompletionTracker;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,6 +53,7 @@ public class WorldSelectScene implements Scene {
     }
 
     private final SceneManager sceneManager;
+    private final WorldCompletionTracker completionTracker;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF backButton = new RectF();
     private final List<WorldCard> worldCards = new ArrayList<>();
@@ -60,8 +62,11 @@ public class WorldSelectScene implements Scene {
     private int surfaceHeight;
     private WorldInfo highlightedWorld;
 
-    public WorldSelectScene(Context context, SceneManager sceneManager) {
+    public WorldSelectScene(Context context,
+                            SceneManager sceneManager,
+                            WorldCompletionTracker completionTracker) {
         this.sceneManager = sceneManager;
+        this.completionTracker = completionTracker;
         populateWorlds();
     }
 
@@ -166,7 +171,9 @@ public class WorldSelectScene implements Scene {
     private void drawWorldCards(Canvas canvas) {
         for (WorldCard card : worldCards) {
             boolean isActive = highlightedWorld != null && highlightedWorld.equals(card.worldInfo);
-            drawWorldCard(canvas, card, isActive);
+            boolean isCompleted = completionTracker != null
+                    && completionTracker.isWorldCompleted(card.worldInfo.getProgramNumber());
+            drawWorldCard(canvas, card, isActive, isCompleted);
         }
     }
 
@@ -280,7 +287,10 @@ public class WorldSelectScene implements Scene {
         paint.setStrokeCap(Paint.Cap.BUTT);
     }
 
-    private void drawWorldCard(Canvas canvas, WorldCard card, boolean isActive) {
+    private void drawWorldCard(Canvas canvas,
+                               WorldCard card,
+                               boolean isActive,
+                               boolean isCompleted) {
         float cornerRadius = card.bounds.height() * 0.45f;
 
         // Shadow halo for "island"
@@ -327,6 +337,37 @@ public class WorldSelectScene implements Scene {
         paint.setTextSize(cardHeight * 0.11f);
         String cta = isActive ? "tap(); // starten" : "load();";
         canvas.drawText(cta, centerX, Math.min(card.bounds.bottom - cardHeight * 0.12f, descStartY + lineHeight), paint);
+
+        if (isCompleted) {
+            drawCompletionBadge(canvas, card);
+        }
+    }
+
+    private void drawCompletionBadge(Canvas canvas, WorldCard card) {
+        float radius = card.bounds.width() * 0.12f;
+        float cx = card.bounds.right - radius * 1.3f;
+        float cy = card.bounds.top + radius * 1.3f;
+
+        Paint.Style originalStyle = paint.getStyle();
+        int originalColor = paint.getColor();
+        float originalStroke = paint.getStrokeWidth();
+
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.parseColor("#2E7D32"));
+        canvas.drawCircle(cx, cy, radius, paint);
+
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(radius * 0.22f);
+        paint.setColor(Color.WHITE);
+        Path check = new Path();
+        check.moveTo(cx - radius * 0.6f, cy);
+        check.lineTo(cx - radius * 0.15f, cy + radius * 0.45f);
+        check.lineTo(cx + radius * 0.7f, cy - radius * 0.35f);
+        canvas.drawPath(check, paint);
+
+        paint.setStyle(originalStyle);
+        paint.setColor(originalColor);
+        paint.setStrokeWidth(originalStroke);
     }
 
     private float drawWrappedCenteredText(Canvas canvas, String text, float centerX,

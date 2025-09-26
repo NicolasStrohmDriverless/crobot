@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.crobot.game.level.LevelModel;
 import com.crobot.game.level.LevelRepository;
 import com.example.robotparkour.R;
+import com.example.robotparkour.storage.WorldCompletionTracker;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,6 +37,7 @@ public class GameActivity extends AppCompatActivity {
     private LevelRepository levelRepository;
     private ExecutorService executorService;
     private Handler mainHandler;
+    private WorldCompletionTracker completionTracker;
 
     public static void start(@NonNull Context context, int world, int stage) {
         Intent intent = new Intent(context, GameActivity.class);
@@ -59,6 +61,9 @@ public class GameActivity extends AppCompatActivity {
         levelRepository = new LevelRepository(this);
         executorService = Executors.newSingleThreadExecutor();
         mainHandler = new Handler(Looper.getMainLooper());
+        completionTracker = new WorldCompletionTracker(this);
+
+        gameView.setLevelCompletionListener(this::onLevelCompleted);
 
         int world = getIntent().getIntExtra(EXTRA_WORLD, 1);
         int stage = getIntent().getIntExtra(EXTRA_STAGE, 1);
@@ -125,11 +130,29 @@ public class GameActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        gameView.onHostDestroy();
+        if (gameView != null) {
+            gameView.setLevelCompletionListener(null);
+            gameView.onHostDestroy();
+        }
         if (executorService != null) {
             executorService.shutdownNow();
             executorService = null;
         }
         super.onDestroy();
+    }
+
+    private void onLevelCompleted(int world, int stage) {
+        if (completionTracker != null) {
+            completionTracker.markCompleted(world, stage);
+        }
+        if (mainHandler != null) {
+            mainHandler.postDelayed(() -> {
+                if (!isFinishing()) {
+                    finish();
+                }
+            }, 1200L);
+        } else {
+            finish();
+        }
     }
 }

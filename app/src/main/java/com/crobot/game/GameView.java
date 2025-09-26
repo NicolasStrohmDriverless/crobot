@@ -11,6 +11,7 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.util.SparseArray;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -36,6 +37,75 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
     public enum Control { LEFT, RIGHT, JUMP }
 
+    public interface LevelCompletionListener {
+        void onLevelCompleted(int world, int stage);
+    }
+
+    private static final class BackgroundTheme {
+        final int backgroundColor;
+        final int tabOuterColor;
+        final int tabInnerColor;
+        final int activeOuterColor;
+        final int activeInnerColor;
+        final int farHillColor;
+        final int midHillColor;
+        final int bushOuterColor;
+        final int bushInnerColor;
+        final int indentColor;
+        final int accentGlyphColor;
+        final int glintColor;
+        final int gutterBaseColor;
+        final int gutterLightColor;
+        final int gutterTrackColor;
+        final int minimapBaseColor;
+        final int minimapOutlineColor;
+        final int minimapGlowColor;
+        final int statusBarColor;
+
+        BackgroundTheme(int backgroundColor,
+                        int tabOuterColor,
+                        int tabInnerColor,
+                        int activeOuterColor,
+                        int activeInnerColor,
+                        int farHillColor,
+                        int midHillColor,
+                        int bushOuterColor,
+                        int bushInnerColor,
+                        int indentColor,
+                        int accentGlyphColor,
+                        int glintColor,
+                        int gutterBaseColor,
+                        int gutterLightColor,
+                        int gutterTrackColor,
+                        int minimapBaseColor,
+                        int minimapOutlineColor,
+                        int minimapGlowColor,
+                        int statusBarColor) {
+            this.backgroundColor = backgroundColor;
+            this.tabOuterColor = tabOuterColor;
+            this.tabInnerColor = tabInnerColor;
+            this.activeOuterColor = activeOuterColor;
+            this.activeInnerColor = activeInnerColor;
+            this.farHillColor = farHillColor;
+            this.midHillColor = midHillColor;
+            this.bushOuterColor = bushOuterColor;
+            this.bushInnerColor = bushInnerColor;
+            this.indentColor = indentColor;
+            this.accentGlyphColor = accentGlyphColor;
+            this.glintColor = glintColor;
+            this.gutterBaseColor = gutterBaseColor;
+            this.gutterLightColor = gutterLightColor;
+            this.gutterTrackColor = gutterTrackColor;
+            this.minimapBaseColor = minimapBaseColor;
+            this.minimapOutlineColor = minimapOutlineColor;
+            this.minimapGlowColor = minimapGlowColor;
+            this.statusBarColor = statusBarColor;
+        }
+    }
+
+    private static final SparseArray<BackgroundTheme> BACKGROUND_THEMES = createBackgroundThemes();
+    private static final BackgroundTheme DEFAULT_THEME = BACKGROUND_THEMES.get(1);
+
     private static final float FIXED_TIME_STEP = 1f / 60f;
     private static final float GRAVITY = 1400f;
     private static final float MOVE_SPEED = 200f;
@@ -52,6 +122,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     private final Rect srcRect = new Rect();
     private final Rect dstRect = new Rect();
     private final RectF tempRectF = new RectF();
+    private final RectF flagBounds = new RectF();
 
     private Thread renderThread;
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -81,6 +152,12 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     private int currentStage = 1;
     @Nullable
     private WorldInfo currentWorldInfo;
+    @Nullable
+    private BackgroundTheme currentBackgroundTheme = DEFAULT_THEME;
+    @Nullable
+    private LevelCompletionListener levelCompletionListener;
+    private boolean levelCompleted;
+    private boolean completionSoundPlayed;
 
     public GameView(@NonNull Context context) {
         super(context);
@@ -94,10 +171,19 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         init();
     }
 
+    public void setLevelCompletionListener(@Nullable LevelCompletionListener listener) {
+        levelCompletionListener = listener;
+    }
+
     private void init() {
         getHolder().addCallback(this);
         setFocusable(true);
-        backgroundPaint.setColor(Color.rgb(20, 26, 48));
+        BackgroundTheme theme = currentBackgroundTheme != null ? currentBackgroundTheme : DEFAULT_THEME;
+        if (theme != null) {
+            backgroundPaint.setColor(theme.backgroundColor);
+        } else {
+            backgroundPaint.setColor(Color.rgb(20, 26, 48));
+        }
         entityPaint.setColor(Color.YELLOW);
         textPaint.setColor(Color.WHITE);
         textPaint.setTextSize(20f);
@@ -112,6 +198,13 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         currentWorldNumber = Math.max(1, world);
         currentStage = Math.max(1, stage);
         currentWorldInfo = LegacyWorldData.findWorld(currentWorldNumber);
+        currentBackgroundTheme = BACKGROUND_THEMES.get(currentWorldNumber);
+        if (currentBackgroundTheme == null) {
+            currentBackgroundTheme = DEFAULT_THEME;
+        }
+        if (currentBackgroundTheme != null) {
+            backgroundPaint.setColor(currentBackgroundTheme.backgroundColor);
+        }
         cameraX = 0f;
         cameraY = 0f;
         parallaxTimer = 0f;
@@ -123,6 +216,12 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         player.onGround = false;
         player.facingRight = true;
         shouldPlayJumpSound = false;
+        levelCompleted = false;
+        completionSoundPlayed = false;
+        moveLeft = false;
+        moveRight = false;
+        jumpPressed = false;
+        jumpConsumed = false;
 
         boolean spawnFound = false;
         for (LevelModel.Entity entity : level.getEntities()) {
@@ -258,6 +357,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         parallaxTimer += deltaSeconds;
         animationTimer += deltaSeconds;
         updateScale(level);
+        if (levelCompleted) {
+            updateCamera(level);
+            return;
+        }
         handleInput(deltaSeconds);
         applyPhysics(deltaSeconds, level);
         if (shouldPlayJumpSound) {
@@ -265,6 +368,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             shouldPlayJumpSound = false;
         }
         updateCamera(level);
+        checkLevelCompletion(level);
     }
 
     private void handleInput(float deltaSeconds) {
@@ -407,6 +511,292 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         cameraY = clamp(targetY, 0f, maxScrollY);
     }
 
+    private void checkLevelCompletion(@NonNull LevelModel level) {
+        if (levelCompleted) {
+            return;
+        }
+        RectF playerBounds = player.getBounds();
+        float tileWidth = level.getTileWidth();
+        float tileHeight = level.getTileHeight();
+        for (LevelModel.Entity entity : level.getEntities()) {
+            String type = entity.getType();
+            if (type == null) {
+                continue;
+            }
+            String lowerType = type.toLowerCase(Locale.US);
+            if (lowerType.contains("flag")) {
+                buildFlagBounds(entity, tileWidth, tileHeight, flagBounds);
+                if (RectF.intersects(playerBounds, flagBounds)) {
+                    triggerLevelCompleted();
+                    break;
+                }
+            }
+        }
+    }
+
+    private void buildFlagBounds(@NonNull LevelModel.Entity entity,
+                                 float tileWidth,
+                                 float tileHeight,
+                                 @NonNull RectF outBounds) {
+        float baseX = entity.getX();
+        float baseY = entity.getY();
+        float poleHeight = tileHeight * 3.2f;
+        float left = baseX - tileWidth * 0.7f;
+        float right = baseX + tileWidth * 1.5f;
+        float top = baseY - poleHeight;
+        float bottom = baseY + tileHeight * 0.4f;
+        if (right < left) {
+            float temp = left;
+            left = right;
+            right = temp;
+        }
+        if (bottom < top) {
+            float temp = top;
+            top = bottom;
+            bottom = temp;
+        }
+        outBounds.set(left, top, right, bottom);
+    }
+
+    private void triggerLevelCompleted() {
+        if (levelCompleted) {
+            return;
+        }
+        levelCompleted = true;
+        moveLeft = false;
+        moveRight = false;
+        jumpPressed = false;
+        shouldPlayJumpSound = false;
+        player.vx = 0f;
+        player.vy = 0f;
+        player.onGround = true;
+        if (!completionSoundPlayed) {
+            audioManager.playVictory();
+            completionSoundPlayed = true;
+        }
+        final int world = currentWorldNumber;
+        final int stage = currentStage;
+        post(() -> notifyLevelCompleted(world, stage));
+    }
+
+    private void notifyLevelCompleted(int world, int stage) {
+        LevelCompletionListener listener = levelCompletionListener;
+        if (listener != null) {
+            listener.onLevelCompleted(world, stage);
+        }
+    }
+
+    private static SparseArray<BackgroundTheme> createBackgroundThemes() {
+        SparseArray<BackgroundTheme> map = new SparseArray<>();
+        map.put(1, new BackgroundTheme(
+                color("#1E1E1E"),
+                color("#252526"),
+                color("#2D2D2D"),
+                color("#1F1F1F"),
+                color("#252526"),
+                color("#1B2C33"),
+                color("#15252B"),
+                color("#1F241F"),
+                color("#2A3A29"),
+                color("#283238"),
+                color("#CE9178"),
+                color("#DCDCAA"),
+                color("#141414"),
+                color("#F14C4C"),
+                color("#252526"),
+                color("#1B3443"),
+                color("#2E4F60"),
+                color("#4FC1FF"),
+                color("#007ACC")));
+        map.put(2, new BackgroundTheme(
+                color("#221C24"),
+                color("#2E2533"),
+                color("#3B3044"),
+                color("#38273F"),
+                color("#4B3654"),
+                color("#3D2E4D"),
+                color("#2A2038"),
+                color("#3F2B46"),
+                color("#5A3A5D"),
+                color("#4A3957"),
+                color("#E0C38C"),
+                color("#F4D8A8"),
+                color("#1B1422"),
+                color("#FF8E3C"),
+                color("#4C3A5A"),
+                color("#2D2238"),
+                color("#4C3C5F"),
+                color("#FFBE6F"),
+                color("#9A6BFF")));
+        map.put(3, new BackgroundTheme(
+                color("#101322"),
+                color("#18203A"),
+                color("#233055"),
+                color("#1F2A47"),
+                color("#2E3D6A"),
+                color("#1C2850"),
+                color("#111C3A"),
+                color("#1D2450"),
+                color("#2F3A7A"),
+                color("#233463"),
+                color("#C792EA"),
+                color("#A0E8FF"),
+                color("#0D1424"),
+                color("#7F7BFF"),
+                color("#202A4A"),
+                color("#142044"),
+                color("#263B72"),
+                color("#64F5FF"),
+                color("#375DFF")));
+        map.put(4, new BackgroundTheme(
+                color("#1B0F0D"),
+                color("#2A1612"),
+                color("#3A1F16"),
+                color("#3C1A13"),
+                color("#532216"),
+                color("#401F1A"),
+                color("#2C1410"),
+                color("#3F1D14"),
+                color("#6B2A1C"),
+                color("#402620"),
+                color("#FFB37A"),
+                color("#FFD7A1"),
+                color("#1B0C07"),
+                color("#FF5E3A"),
+                color("#462017"),
+                color("#2A1814"),
+                color("#4A2B20"),
+                color("#FF824A"),
+                color("#E2522E")));
+        map.put(5, new BackgroundTheme(
+                color("#0F1A1F"),
+                color("#13242B"),
+                color("#1F3943"),
+                color("#1A2E36"),
+                color("#234550"),
+                color("#143C4A"),
+                color("#0E2A35"),
+                color("#123540"),
+                color("#1D4E5A"),
+                color("#1A3D4A"),
+                color("#8FF7FF"),
+                color("#7CFFE6"),
+                color("#07171F"),
+                color("#2CF9FF"),
+                color("#1C3D46"),
+                color("#0F2832"),
+                color("#1D4C59"),
+                color("#5FFFE1"),
+                color("#1FA7C6")));
+        map.put(6, new BackgroundTheme(
+                color("#0B1316"),
+                color("#142125"),
+                color("#1E2F34"),
+                color("#1C2A2F"),
+                color("#233C44"),
+                color("#16292F"),
+                color("#0E1C21"),
+                color("#14282C"),
+                color("#214045"),
+                color("#1B3338"),
+                color("#9AD7D3"),
+                color("#A8FFF2"),
+                color("#061013"),
+                color("#4FE3C8"),
+                color("#1A3338"),
+                color("#11262C"),
+                color("#23474E"),
+                color("#6CF9D7"),
+                color("#2A9C8E")));
+        map.put(7, new BackgroundTheme(
+                color("#101D16"),
+                color("#1A2C22"),
+                color("#284237"),
+                color("#234534"),
+                color("#325C45"),
+                color("#1C4734"),
+                color("#153427"),
+                color("#1E4A33"),
+                color("#2E6F4A"),
+                color("#2B5A3F"),
+                color("#C0FF8F"),
+                color("#E2FFB0"),
+                color("#0D1A13"),
+                color("#7CFF9E"),
+                color("#244A35"),
+                color("#143926"),
+                color("#286046"),
+                color("#A4FFAF"),
+                color("#3BC976")));
+        map.put(8, new BackgroundTheme(
+                color("#18140F"),
+                color("#261E17"),
+                color("#352A1F"),
+                color("#352516"),
+                color("#4C3622"),
+                color("#3A2C1E"),
+                color("#271D13"),
+                color("#3A2A1A"),
+                color("#5B3D25"),
+                color("#423123"),
+                color("#FFCA7A"),
+                color("#FFDFA8"),
+                color("#120D08"),
+                color("#FF9C3C"),
+                color("#3F2C1D"),
+                color("#21170F"),
+                color("#423320"),
+                color("#FFB469"),
+                color("#F27E32")));
+        map.put(9, new BackgroundTheme(
+                color("#0D1018"),
+                color("#161C2C"),
+                color("#222C44"),
+                color("#1D2436"),
+                color("#2D3853"),
+                color("#202B4A"),
+                color("#131B30"),
+                color("#1D2A4A"),
+                color("#2F3D64"),
+                color("#263654"),
+                color("#9CF0FF"),
+                color("#D0F4FF"),
+                color("#070B14"),
+                color("#6F7CFF"),
+                color("#1F2C47"),
+                color("#15223C"),
+                color("#2A3F62"),
+                color("#7FE0FF"),
+                color("#2E6CFF")));
+        if (map.get(1) == null) {
+            map.put(1, new BackgroundTheme(
+                    color("#1E1E1E"),
+                    color("#252526"),
+                    color("#2D2D2D"),
+                    color("#1F1F1F"),
+                    color("#252526"),
+                    color("#1B2C33"),
+                    color("#15252B"),
+                    color("#1F241F"),
+                    color("#2A3A29"),
+                    color("#283238"),
+                    color("#CE9178"),
+                    color("#DCDCAA"),
+                    color("#141414"),
+                    color("#F14C4C"),
+                    color("#252526"),
+                    color("#1B3443"),
+                    color("#2E4F60"),
+                    color("#4FC1FF"),
+                    color("#007ACC")));
+        }
+        return map;
+    }
+
+    private static int color(@NonNull String hex) {
+        return Color.parseColor(hex);
+    }
+
     private void render(@NonNull Canvas canvas) {
         int width = canvas.getWidth();
         int height = canvas.getHeight();
@@ -429,17 +819,22 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             return;
         }
         canvas.save();
-        drawPointerPlainsBackground(canvas, width, height, parallaxTimer);
+        BackgroundTheme theme = currentBackgroundTheme != null ? currentBackgroundTheme : DEFAULT_THEME;
+        if (theme == null) {
+            theme = DEFAULT_THEME;
+        }
+        drawPointerPlainsBackground(canvas, width, height, parallaxTimer, theme);
         canvas.restore();
-        drawStatusBar(canvas, width, height);
+        drawStatusBar(canvas, width, height, theme);
         drawScanlineOverlay(canvas, width, height);
     }
 
     private void drawPointerPlainsBackground(@NonNull Canvas canvas,
                                              int width,
                                              int height,
-                                             float time) {
-        paintSolidBackground(canvas, Color.parseColor("#1E1E1E"), width, height);
+                                             float time,
+                                             @NonNull BackgroundTheme theme) {
+        paintSolidBackground(canvas, theme.backgroundColor, width, height);
 
         float tabPeriod = Math.max(width / 4f, 320f);
         float tabOffset = computeLoopOffset(time, BASE_SCROLL_SPEED * 0.2f, tabPeriod);
@@ -447,26 +842,26 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             float left = x - tabOffset;
             RectF outer = new RectF(left + tabPeriod * 0.08f, 12f,
                     left + tabPeriod * 0.72f, SAFE_TOP_PX - 12f);
-            uiPaint.setColor(Color.parseColor("#252526"));
+            uiPaint.setColor(theme.tabOuterColor);
             canvas.drawRoundRect(outer, 26f, 26f, uiPaint);
-            uiPaint.setColor(Color.parseColor("#2D2D2D"));
+            uiPaint.setColor(theme.tabInnerColor);
             canvas.drawRoundRect(new RectF(outer.left + 12f, outer.top + 8f,
                     outer.right - 12f, outer.bottom - 8f), 20f, 20f, uiPaint);
         }
-        uiPaint.setColor(Color.parseColor("#1F1F1F"));
+        uiPaint.setColor(theme.activeOuterColor);
         RectF active = new RectF(width * 0.34f, 8f, width * 0.58f, SAFE_TOP_PX - 10f);
         canvas.drawRoundRect(active, 28f, 28f, uiPaint);
-        uiPaint.setColor(Color.parseColor("#252526"));
+        uiPaint.setColor(theme.activeInnerColor);
         canvas.drawRoundRect(new RectF(active.left + 12f, active.top + 10f,
                 active.right - 12f, active.bottom - 14f), 22f, 22f, uiPaint);
 
         float farPeriod = Math.max(width / 3f, 280f);
         drawHillBand(canvas, width, height * 0.58f, height,
                 farPeriod, computeLoopOffset(time, BASE_SCROLL_SPEED * 0.2f, farPeriod),
-                height * 0.12f, Color.parseColor("#1B2C33"));
+                height * 0.12f, theme.farHillColor);
         drawHillBand(canvas, width, height * 0.68f, height,
                 farPeriod * 0.8f, computeLoopOffset(time, BASE_SCROLL_SPEED * 0.35f, farPeriod * 0.8f),
-                height * 0.16f, Color.parseColor("#15252B"));
+                height * 0.16f, theme.midHillColor);
 
         float bushPeriod = Math.max(width / 2.6f, 260f);
         float bushOffset = computeLoopOffset(time, BASE_SCROLL_SPEED * 0.5f, bushPeriod);
@@ -474,19 +869,19 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             float left = x - bushOffset + width * 0.05f;
             RectF bush = new RectF(left, height * 0.62f,
                     left + bushPeriod * 0.64f, height * 0.82f);
-            uiPaint.setColor(Color.parseColor("#1F241F"));
+            uiPaint.setColor(theme.bushOuterColor);
             canvas.drawRoundRect(bush, 40f, 40f, uiPaint);
-            uiPaint.setColor(Color.parseColor("#2A3A29"));
+            uiPaint.setColor(theme.bushInnerColor);
             canvas.drawRoundRect(new RectF(bush.left + 14f, bush.top + 14f,
                     bush.right - 14f, bush.bottom - 14f), 34f, 34f, uiPaint);
         }
 
         drawIndentGuides(canvas, width, width * 0.22f, SAFE_TOP_PX + 16f,
                 height - SAFE_BOTTOM_PX - 36f, width * 0.05f,
-                Color.parseColor("#283238"),
+                theme.indentColor,
                 computeLoopOffset(time, BASE_SCROLL_SPEED * 0.2f, width * 0.05f));
 
-        uiPaint.setColor(Color.parseColor("#CE9178"));
+        uiPaint.setColor(theme.accentGlyphColor);
         uiPaint.setTextAlign(Paint.Align.CENTER);
         uiPaint.setTextSize(height * 0.045f);
         for (int i = 0; i < 7; i++) {
@@ -495,7 +890,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             canvas.drawText(";", px, py, uiPaint);
         }
 
-        uiPaint.setColor(Color.parseColor("#DCDCAA"));
+        uiPaint.setColor(theme.glintColor);
         uiPaint.setAlpha(120);
         float glintOffset = computeLoopOffset(time, BASE_SCROLL_SPEED * 0.5f, width * 0.18f);
         for (float x = -width * 0.18f; x < width + width * 0.18f; x += width * 0.18f) {
@@ -505,10 +900,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         }
         uiPaint.setAlpha(255);
 
-        drawGutterRail(canvas, width, height, width * 0.05f, Color.parseColor("#141414"),
-                Color.parseColor("#F14C4C"), time, 0.8f, 0.32f);
-        drawMinimapColumn(canvas, width, height, Color.parseColor("#1B3443"),
-                Color.parseColor("#2E4F60"), Color.parseColor("#4FC1FF"), time, 0.5f);
+        drawGutterRail(canvas, width, height, width * 0.05f, theme.gutterBaseColor,
+                theme.gutterLightColor, theme.gutterTrackColor, time, 0.8f, 0.32f);
+        drawMinimapColumn(canvas, width, height, theme.minimapBaseColor,
+                theme.minimapOutlineColor, theme.minimapGlowColor, time, 0.5f);
     }
 
     private void paintSolidBackground(@NonNull Canvas canvas, int color, int width, int height) {
@@ -517,9 +912,12 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         canvas.drawRect(0f, 0f, width, height, uiPaint);
     }
 
-    private void drawStatusBar(@NonNull Canvas canvas, int width, int height) {
+    private void drawStatusBar(@NonNull Canvas canvas,
+                               int width,
+                               int height,
+                               @NonNull BackgroundTheme theme) {
         uiPaint.setStyle(Paint.Style.FILL);
-        uiPaint.setColor(Color.parseColor("#007ACC"));
+        uiPaint.setColor(theme.statusBarColor);
         canvas.drawRect(0f, height - SAFE_BOTTOM_PX, width, height, uiPaint);
     }
 
@@ -588,6 +986,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                                  float railWidth,
                                  int baseColor,
                                  int lightColor,
+                                 int trackColor,
                                  float time,
                                  float speedFactor,
                                  float glowStrength) {
@@ -596,7 +995,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         uiPaint.setColor(baseColor);
         canvas.drawRect(0f, SAFE_TOP_PX, railWidth, bottom, uiPaint);
 
-        uiPaint.setColor(Color.parseColor("#252526"));
+        uiPaint.setColor(trackColor);
         float verticalOffset = computeLoopOffset(time, BASE_SCROLL_SPEED * speedFactor, railWidth * 0.6f);
         canvas.drawRect(verticalOffset - railWidth * 0.25f, SAFE_TOP_PX,
                 verticalOffset - railWidth * 0.25f + 3f, bottom, uiPaint);
@@ -1031,6 +1430,9 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     }
 
     public void handleButtonTouch(@NonNull Control control, @NonNull MotionEvent event) {
+        if (levelCompleted) {
+            return;
+        }
         boolean pressed = event.getActionMasked() != MotionEvent.ACTION_UP
                 && event.getActionMasked() != MotionEvent.ACTION_CANCEL;
         switch (control) {

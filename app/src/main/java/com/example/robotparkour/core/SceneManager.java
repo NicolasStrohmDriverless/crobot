@@ -15,6 +15,7 @@ import com.example.robotparkour.scene.ScoreboardScene;
 import com.example.robotparkour.scene.SettingsScene;
 import com.example.robotparkour.scene.WorldSelectScene;
 import com.example.robotparkour.storage.ScoreboardManager;
+import com.example.robotparkour.storage.WorldCompletionTracker;
 import com.example.robotparkour.util.GameResult;
 
 import java.util.EnumMap;
@@ -30,6 +31,7 @@ public class SceneManager {
     private final GameView gameView;
     private final ScoreboardManager scoreboardManager;
     private final GameAudioManager audioManager;
+    private final WorldCompletionTracker completionTracker;
     private final Map<SceneType, Scene> scenes = new EnumMap<>(SceneType.class);
 
     private Scene currentScene;
@@ -51,6 +53,7 @@ public class SceneManager {
         this.gameView = gameView;
         this.scoreboardManager = scoreboardManager;
         this.audioManager = audioManager;
+        this.completionTracker = new WorldCompletionTracker(appContext);
         createScenes();
     }
 
@@ -70,7 +73,7 @@ public class SceneManager {
         SettingsScene settingsScene = new SettingsScene(appContext, this);
         registerScene(settingsScene);
 
-        worldSelectScene = new WorldSelectScene(appContext, this);
+        worldSelectScene = new WorldSelectScene(appContext, this, completionTracker);
         registerScene(worldSelectScene);
 
         if (selectedWorld == null) {

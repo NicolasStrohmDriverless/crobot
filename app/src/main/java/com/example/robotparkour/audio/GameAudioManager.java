@@ -25,6 +25,7 @@ public class GameAudioManager {
     private int jumpSoundId;
     private int coinSoundId;
     private int errorSoundId;
+    private int victorySoundId;
 
     private boolean soundEnabled = true;
     private boolean musicEnabled = true;
@@ -52,6 +53,7 @@ public class GameAudioManager {
         jumpSoundId = loadSound(R.raw.jump);
         coinSoundId = loadSound(R.raw.coin);
         errorSoundId = loadSound(R.raw.error);
+        victorySoundId = loadSound(R.raw.victory);
     }
 
     private int loadSound(@RawRes int resId) {
@@ -90,22 +92,28 @@ public class GameAudioManager {
     }
 
     public void playJump() {
-        playEffect(jumpSoundId);
+        playEffect(jumpSoundId, 0.8f);
     }
 
     public void playCoin() {
-        playEffect(coinSoundId);
+        playEffect(coinSoundId, 0.8f);
     }
 
     public void playError() {
-        playEffect(errorSoundId);
+        playEffect(errorSoundId, 0.8f);
     }
 
-    private void playEffect(int soundId) {
+    public void playVictory() {
+        stopMusic();
+        playEffect(victorySoundId, 1.0f);
+    }
+
+    private void playEffect(int soundId, float volume) {
         if (!soundEnabled || soundPool == null || soundId <= 0) {
             return;
         }
-        soundPool.play(soundId, 0.8f, 0.8f, 1, 0, 1f);
+        float clamped = Math.max(0f, Math.min(1f, volume));
+        soundPool.play(soundId, clamped, clamped, 1, 0, 1f);
     }
 
     public void startMusic() {
