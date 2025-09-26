@@ -18,7 +18,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.crobot.game.level.LevelModel;
 import com.crobot.game.level.LevelRepository;
-
+import com.example.robotparkour.R;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -73,18 +73,13 @@ public class GameActivity extends AppCompatActivity {
         View jump = findViewById(R.id.button_jump);
 
         View.OnTouchListener listener = (view, motionEvent) -> {
-            switch (view.getId()) {
-                case R.id.button_left:
-                    gameView.handleButtonTouch(GameView.Control.LEFT, motionEvent);
-                    break;
-                case R.id.button_right:
-                    gameView.handleButtonTouch(GameView.Control.RIGHT, motionEvent);
-                    break;
-                case R.id.button_jump:
-                    gameView.handleButtonTouch(GameView.Control.JUMP, motionEvent);
-                    break;
-                default:
-                    break;
+            int id = view.getId();
+            if (id == R.id.button_left) {
+                gameView.handleButtonTouch(GameView.Control.LEFT, motionEvent);
+            } else if (id == R.id.button_right) {
+                gameView.handleButtonTouch(GameView.Control.RIGHT, motionEvent);
+            } else if (id == R.id.button_jump) {
+                gameView.handleButtonTouch(GameView.Control.JUMP, motionEvent);
             }
             return true;
         };

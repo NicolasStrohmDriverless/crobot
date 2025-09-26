@@ -1,4 +1,7 @@
 # ninja log v5
 0	454	1758893128815428283	CMakeFiles/crobot_native.dir/jni_bridge.cpp.o	a23ea90159836293
-0	1483	1758893129831389028	CMakeFiles/crobot_native.dir/smb_format_decoder.cpp.o	5a3ff2660939fc8a
 1483	1506	1758893129871387482	/home/nico/UNI/Android Programmierung/crobot/app/build/intermediates/cxx/Debug/50441n6t/obj/arm64-v8a/libcrobot_native.so	f6f078036791344c
+0	1483	1758893129831389028	CMakeFiles/crobot_native.dir/smb_format_decoder.cpp.o	5a3ff2660939fc8a
+3	421	1758893442257193120	CMakeFiles/crobot_native.dir/jni_bridge.cpp.o	a23ea90159836293
+4	1545	1758893443363144598	CMakeFiles/crobot_native.dir/smb_format_decoder.cpp.o	5a3ff2660939fc8a
+1545	1568	1758893443407142667	/home/nico/UNI/Android Programmierung/crobot/app/build/intermediates/cxx/Debug/50441n6t/obj/arm64-v8a/libcrobot_native.so	f6f078036791344c
