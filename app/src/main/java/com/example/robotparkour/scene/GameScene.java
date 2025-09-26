@@ -15,6 +15,7 @@ import com.example.robotparkour.audio.WorldMusicLibrary;
 import com.example.robotparkour.core.Scene;
 import com.example.robotparkour.core.SceneManager;
 import com.example.robotparkour.core.SceneType;
+import com.example.robotparkour.core.WorldInfo;
 import com.example.robotparkour.entity.Coin;
 import com.example.robotparkour.entity.Flag;
 import com.example.robotparkour.entity.Robot;
