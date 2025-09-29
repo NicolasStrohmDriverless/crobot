@@ -30,11 +30,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Presents a paged Material-themed overlay for selecting the dynamically generated labyrinths.
+ * Presents a Material-themed overlay for selecting the dynamically generated labyrinths.
  */
 public class WorldSelectScene implements Scene {
-
-    private static final int LEVELS_PER_PAGE = 4;
 
     private final Context appContext;
     private final SceneManager sceneManager;
@@ -205,7 +203,10 @@ public class WorldSelectScene implements Scene {
     private void reloadLevels() {
         LevelCatalog catalog = LevelCatalog.getInstance(appContext);
         descriptors = catalog.getDescriptors();
-        pages = partition(descriptors, LEVELS_PER_PAGE);
+        pages = new ArrayList<>();
+        if (descriptors != null && !descriptors.isEmpty()) {
+            pages.add(new ArrayList<>(descriptors));
+        }
         if (adapter != null) {
             adapter.submitPages(pages);
             adapter.setHighlightedWorld(highlightedWorld);
@@ -237,6 +238,11 @@ public class WorldSelectScene implements Scene {
         }
         indicatorContainer.removeAllViews();
         LayoutInflater hostInflater = LayoutInflater.from(overlayHost != null ? overlayHost.getContext() : appContext);
+        if (pages.size() <= 1) {
+            indicatorContainer.setVisibility(View.GONE);
+            return;
+        }
+        indicatorContainer.setVisibility(View.VISIBLE);
         for (int i = 0; i < pages.size(); i++) {
             View dot = hostInflater.inflate(R.layout.view_pager_dot, indicatorContainer, false);
             indicatorContainer.addView(dot);
@@ -245,6 +251,9 @@ public class WorldSelectScene implements Scene {
 
     private void updateIndicators(int position) {
         if (indicatorContainer == null) {
+            return;
+        }
+        if (indicatorContainer.getChildCount() == 0) {
             return;
         }
         int count = indicatorContainer.getChildCount();
@@ -256,28 +265,19 @@ public class WorldSelectScene implements Scene {
 
     private void updateNavigationButtons(int position) {
         int lastIndex = Math.max(0, pages.size() - 1);
+        boolean allowPaging = pages.size() > 1;
         if (previousButton != null) {
-            boolean enabled = position > 0;
+            boolean enabled = allowPaging && position > 0;
             previousButton.setEnabled(enabled);
             previousButton.setAlpha(enabled ? 1f : 0.4f);
+            previousButton.setVisibility(allowPaging ? View.VISIBLE : View.GONE);
         }
         if (nextButton != null) {
-            boolean enabled = position < lastIndex;
+            boolean enabled = allowPaging && position < lastIndex;
             nextButton.setEnabled(enabled);
             nextButton.setAlpha(enabled ? 1f : 0.4f);
+            nextButton.setVisibility(allowPaging ? View.VISIBLE : View.GONE);
         }
-    }
-
-    private static List<List<LevelDescriptor>> partition(@Nullable List<LevelDescriptor> items, int chunkSize) {
-        List<List<LevelDescriptor>> result = new ArrayList<>();
-        if (items == null || items.isEmpty() || chunkSize <= 0) {
-            return result;
-        }
-        for (int i = 0; i < items.size(); i += chunkSize) {
-            int end = Math.min(i + chunkSize, items.size());
-            result.add(new ArrayList<>(items.subList(i, end)));
-        }
-        return result;
     }
 
     private int findPageIndex(@NonNull WorldInfo worldInfo) {
