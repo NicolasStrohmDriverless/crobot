@@ -11,6 +11,7 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.util.SparseArray;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
@@ -26,6 +27,7 @@ import com.crobot.game.level.LevelModel;
 import com.example.robotparkour.audio.GameAudioManager;
 import com.example.robotparkour.audio.WorldMusicLibrary;
 import com.example.robotparkour.core.WorldInfo;
+import com.example.robotparkour.util.TimeFormatter;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -121,12 +123,17 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     private static final int SAFE_TOP_PX = 64;
     private static final int SAFE_BOTTOM_PX = 48;
     private static final float BASE_SCROLL_SPEED = 120f;
+    private static final float BOSS_MESSAGE_DURATION = 4.5f;
+    private static final float BOSS_MESSAGE_FADE = 0.8f;
+    private static final String BOSS_NAME = "KoopaByte";
 
     private final Paint backgroundPaint = new Paint();
     private final Paint entityPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint uiPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint tileFallbackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint timerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint bossTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Rect srcRect = new Rect();
     private final Rect dstRect = new Rect();
     private final RectF tempRectF = new RectF();
@@ -157,6 +164,15 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     private boolean shouldPlayJumpSound;
     private boolean duckPressed;
     private boolean playerRespawnedThisFrame;
+    private boolean isBossWorld;
+    private float runTimerSeconds;
+    private float screenShakeTimer;
+    private float screenShakeDuration;
+    private float screenShakeMagnitude;
+    private float shakeOffsetX;
+    private float shakeOffsetY;
+    private boolean bossMessageVisible;
+    private float bossMessageTimer;
 
     private float previousVx;
 
@@ -210,6 +226,16 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         uiPaint.setStyle(Paint.Style.FILL);
         uiPaint.setColor(Color.WHITE);
         tileFallbackPaint.setStyle(Paint.Style.FILL);
+        timerPaint.setColor(Color.WHITE);
+        timerPaint.setTextSize(32f);
+        timerPaint.setShadowLayer(3f, 0f, 2f, Color.argb(180, 0, 0, 0));
+        timerPaint.setTypeface(Typeface.create(Typeface.DEFAULT_BOLD, Typeface.BOLD));
+        timerPaint.setTextAlign(Paint.Align.LEFT);
+        bossTextPaint.setColor(Color.parseColor("#FF4C4C"));
+        bossTextPaint.setTextSize(64f);
+        bossTextPaint.setShadowLayer(8f, 0f, 0f, Color.argb(200, 0, 0, 0));
+        bossTextPaint.setTextAlign(Paint.Align.CENTER);
+        bossTextPaint.setTypeface(Typeface.create(Typeface.DEFAULT_BOLD, Typeface.BOLD));
     }
 
     public void bindLevel(@NonNull LevelModel level, int world, int stage) {
@@ -224,6 +250,16 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         if (currentBackgroundTheme != null) {
             backgroundPaint.setColor(currentBackgroundTheme.backgroundColor);
         }
+        String worldName = currentWorldInfo != null ? currentWorldInfo.getName() : null;
+        isBossWorld = worldName != null && worldName.toLowerCase(Locale.US).contains("boss");
+        runTimerSeconds = 0f;
+        screenShakeTimer = 0f;
+        screenShakeDuration = 0f;
+        screenShakeMagnitude = 0f;
+        shakeOffsetX = 0f;
+        shakeOffsetY = 0f;
+        bossMessageVisible = false;
+        bossMessageTimer = 0f;
         cameraX = 0f;
         cameraY = 0f;
         parallaxTimer = 0f;
@@ -279,6 +315,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         debugPlatforms.clear();
         guardianGates.clear();
         buildEnemyInstances(level);
+
+        if (isBossWorld) {
+            triggerBossIntro(level);
+        }
 
         loadTilesetBitmap(level.getTilesetAssetPath());
         updateScale(level);
@@ -347,6 +387,14 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             }
             EnemyInstance instance = new EnemyInstance(kind, entity.getX(), entity.getY(),
                     tileWidth, tileHeight, entity.getExtras());
+            if (instance.kind == EnemyKind.PACKET_HOUND && !isBossWorld) {
+                continue;
+            }
+            if (instance.kind == EnemyKind.PACKET_HOUND && isBossWorld) {
+                instance.width = tileWidth * 1.6f;
+                instance.height = tileHeight * 1.9f;
+                instance.animatedSprite = null;
+            }
             enemies.add(instance);
             if (kind == EnemyKind.BOTNET_BEE_LEADER && instance.swarmId != null) {
                 leadersById.put(instance.swarmId, instance);
@@ -362,6 +410,15 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                 enemy.leader = leadersById.get(enemy.leaderId);
             }
         }
+    }
+
+    private void triggerBossIntro(@NonNull LevelModel level) {
+        screenShakeDuration = 1.2f;
+        screenShakeTimer = screenShakeDuration;
+        float tileSize = Math.max(level.getTileWidth(), level.getTileHeight());
+        screenShakeMagnitude = Math.max(tileSize * 0.6f, 18f);
+        bossMessageVisible = true;
+        bossMessageTimer = 0f;
     }
 
     private void updateEnemies(float deltaSeconds, @NonNull LevelModel level) {
@@ -524,6 +581,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                 duckPressed = false;
                 lastPlayerAction = PlayerAction.IDLE;
                 player.respawn();
+                onPlayerRespawned();
                 iterator.remove();
             }
         }
@@ -786,6 +844,9 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                                    float deltaSeconds,
                                    @NonNull LevelModel level) {
         float chaseSpeed = Math.max(80f, getExtraFloat(enemy, "speed", 92f));
+        if (isBossWorld) {
+            chaseSpeed = Math.max(chaseSpeed, 140f);
+        }
         float direction = player.x - enemy.x;
         int dir = direction < 0f ? -1 : 1;
         if (Math.abs(direction) < 1f) {
@@ -1086,6 +1147,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         }
         playerRespawnedThisFrame = true;
         player.respawn();
+        onPlayerRespawned();
         previousVx = 0f;
         lastPlayerAction = PlayerAction.IDLE;
     }
@@ -1178,6 +1240,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                 color = Color.parseColor("#BDBDBD");
                 break;
             case PACKET_HOUND:
+                if (isBossWorld) {
+                    drawKoopaByte(canvas, enemy, left, top, right, bottom);
+                    return;
+                }
                 color = Color.parseColor("#A5D6A7");
                 break;
             case BSOD_BLOCK:
@@ -1243,6 +1309,107 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             entityPaint.setColor(Color.argb(100, 255, 255, 255));
             canvas.drawRect(left, top, right, bottom, entityPaint);
         }
+    }
+
+    private void drawKoopaByte(@NonNull Canvas canvas,
+                               @NonNull EnemyInstance enemy,
+                               float left,
+                               float top,
+                               float right,
+                               float bottom) {
+        float width = right - left;
+        float height = bottom - top;
+        Paint.Style originalStyle = entityPaint.getStyle();
+        int originalColor = entityPaint.getColor();
+        entityPaint.setStyle(Paint.Style.FILL);
+
+        float pulse = (float) Math.sin(animationTimer * 6f) * 0.08f;
+
+        entityPaint.setColor(Color.parseColor("#5C0A0A"));
+        canvas.drawRoundRect(left + width * 0.05f, top + height * 0.24f,
+                right - width * 0.05f, bottom, width * 0.18f, width * 0.18f, entityPaint);
+
+        entityPaint.setColor(Color.parseColor("#C62828"));
+        canvas.drawRoundRect(left + width * 0.12f, top + height * 0.08f,
+                right - width * 0.12f, top + height * (0.6f + pulse * 0.05f), width * 0.25f, width * 0.25f, entityPaint);
+
+        entityPaint.setColor(Color.argb(190, 255, 120, 64));
+        canvas.drawRoundRect(left + width * 0.2f, top + height * (0.18f + pulse * 0.04f),
+                right - width * 0.2f, top + height * 0.52f, width * 0.18f, width * 0.18f, entityPaint);
+
+        entityPaint.setColor(Color.parseColor("#FFE082"));
+        for (int i = 0; i < 4; i++) {
+            float cx = left + width * (0.2f + 0.2f * i);
+            drawSpike(canvas, cx, top + height * 0.04f, width * 0.08f, height * 0.24f);
+        }
+        entityPaint.setColor(Color.parseColor("#FFAB40"));
+        drawSpike(canvas, left + width * 0.1f, top + height * 0.28f, width * 0.07f, height * 0.18f);
+        drawSpike(canvas, right - width * 0.1f, top + height * 0.28f, width * 0.07f, height * 0.18f);
+
+        entityPaint.setColor(Color.parseColor("#4E0707"));
+        canvas.drawRoundRect(left + width * 0.18f, top + height * 0.34f,
+                right - width * 0.18f, bottom - height * 0.15f, width * 0.1f, width * 0.1f, entityPaint);
+
+        entityPaint.setColor(Color.parseColor("#FFD7D7"));
+        float eyeY = top + height * 0.48f;
+        float eyeRadius = width * 0.09f;
+        canvas.drawCircle(left + width * 0.34f, eyeY, eyeRadius, entityPaint);
+        canvas.drawCircle(right - width * 0.34f, eyeY, eyeRadius, entityPaint);
+        entityPaint.setColor(Color.parseColor("#390000"));
+        canvas.drawCircle(left + width * 0.34f, eyeY, eyeRadius * 0.55f, entityPaint);
+        canvas.drawCircle(right - width * 0.34f, eyeY, eyeRadius * 0.55f, entityPaint);
+        entityPaint.setColor(Color.argb(180, 255, 70, 90));
+        canvas.drawCircle(left + width * 0.34f, eyeY, eyeRadius * 0.3f, entityPaint);
+        canvas.drawCircle(right - width * 0.34f, eyeY, eyeRadius * 0.3f, entityPaint);
+
+        entityPaint.setColor(Color.parseColor("#2B0000"));
+        canvas.drawRoundRect(left + width * 0.28f, top + height * 0.58f,
+                right - width * 0.28f, top + height * 0.7f, width * 0.08f, width * 0.08f, entityPaint);
+        entityPaint.setColor(Color.parseColor("#FFB74D"));
+        canvas.drawRect(left + width * 0.3f, top + height * 0.62f,
+                left + width * 0.42f, top + height * 0.66f, entityPaint);
+        canvas.drawRect(right - width * 0.42f, top + height * 0.62f,
+                right - width * 0.3f, top + height * 0.66f, entityPaint);
+
+        entityPaint.setColor(Color.parseColor("#FF6F61"));
+        drawClaw(canvas, left + width * 0.2f, bottom - height * 0.08f, width * 0.12f, height * 0.22f, true);
+        drawClaw(canvas, right - width * 0.2f, bottom - height * 0.08f, width * 0.12f, height * 0.22f, false);
+
+        entityPaint.setColor(Color.argb(130, 255, 64, 192));
+        float stripWidth = width * 0.18f;
+        float stripHeight = height * 0.08f;
+        float offset = (float) Math.sin(animationTimer * 9f) * width * 0.1f;
+        canvas.drawRect(left + width * 0.3f + offset, top + height * 0.32f,
+                left + width * 0.3f + offset + stripWidth, top + height * 0.32f + stripHeight, entityPaint);
+        canvas.drawRect(left + width * 0.25f - offset, top + height * 0.46f,
+                left + width * 0.25f - offset + stripWidth, top + height * 0.46f + stripHeight * 0.6f, entityPaint);
+
+        entityPaint.setStyle(originalStyle);
+        entityPaint.setColor(originalColor);
+    }
+
+    private void drawSpike(@NonNull Canvas canvas, float centerX, float tipY, float halfWidth, float height) {
+        Path path = new Path();
+        path.moveTo(centerX, tipY);
+        path.lineTo(centerX - halfWidth, tipY + height);
+        path.lineTo(centerX + halfWidth, tipY + height);
+        path.close();
+        canvas.drawPath(path, entityPaint);
+    }
+
+    private void drawClaw(@NonNull Canvas canvas,
+                          float baseX,
+                          float baseY,
+                          float width,
+                          float height,
+                          boolean leftHanded) {
+        Path path = new Path();
+        float direction = leftHanded ? -1f : 1f;
+        path.moveTo(baseX, baseY - height * 0.4f);
+        path.lineTo(baseX + direction * width, baseY);
+        path.lineTo(baseX, baseY + height * 0.2f);
+        path.close();
+        canvas.drawPath(path, entityPaint);
     }
 
     private boolean circleIntersects(@NonNull RectF rect,
@@ -1524,6 +1691,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         updateScale(level);
         if (levelCompleted) {
             updateCamera(level);
+            updateBossEffects(deltaSeconds);
             return;
         }
         float timeScale = player.timeSlowTimer > 0f ? 0.6f : 1f;
@@ -1539,8 +1707,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             audioManager.playJump();
             shouldPlayJumpSound = false;
         }
+        runTimerSeconds += deltaSeconds;
         updateCamera(level);
         checkLevelCompletion(level);
+        updateBossEffects(deltaSeconds);
     }
 
     private void updateStatusEffects(float deltaSeconds) {
@@ -1556,6 +1726,32 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         if (player.timeSlowTimer > 0f) {
             player.timeSlowTimer = Math.max(0f, player.timeSlowTimer - deltaSeconds);
         }
+    }
+
+    private void updateBossEffects(float deltaSeconds) {
+        if (screenShakeTimer > 0f) {
+            screenShakeTimer = Math.max(0f, screenShakeTimer - deltaSeconds);
+            float progress = screenShakeDuration > 0f ? screenShakeTimer / screenShakeDuration : 0f;
+            float intensity = screenShakeMagnitude * progress * progress;
+            shakeOffsetX = (random.nextFloat() * 2f - 1f) * intensity;
+            shakeOffsetY = (random.nextFloat() * 2f - 1f) * intensity;
+        } else {
+            shakeOffsetX = 0f;
+            shakeOffsetY = 0f;
+        }
+        if (bossMessageVisible) {
+            bossMessageTimer += deltaSeconds;
+            if (bossMessageTimer >= BOSS_MESSAGE_DURATION) {
+                bossMessageVisible = false;
+            }
+        }
+    }
+
+    private void onPlayerRespawned() {
+        runTimerSeconds = 0f;
+        shakeOffsetX = 0f;
+        shakeOffsetY = 0f;
+        screenShakeTimer = 0f;
     }
 
     private void handleInput(@NonNull LevelModel level) {
@@ -1817,6 +2013,10 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         player.vx = 0f;
         player.vy = 0f;
         player.onGround = true;
+        bossMessageVisible = false;
+        screenShakeTimer = 0f;
+        shakeOffsetX = 0f;
+        shakeOffsetY = 0f;
         if (!completionSoundPlayed) {
             audioManager.playVictory();
             completionSoundPlayed = true;
@@ -2060,6 +2260,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         drawProjectiles(canvas);
         drawPlayer(canvas);
         drawHud(canvas, level);
+        drawBossMessage(canvas);
     }
 
     private void drawParallaxBackground(@NonNull Canvas canvas) {
@@ -2301,6 +2502,8 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         float scale = currentScale > 0f ? currentScale : 1f;
         float viewWidthWorld = canvas.getWidth() / scale;
         float viewHeightWorld = canvas.getHeight() / scale;
+        float cameraX = this.cameraX + shakeOffsetX;
+        float cameraY = this.cameraY + shakeOffsetY;
         int startX = Math.max(0, (int) Math.floor(cameraX / tileWidth));
         int endX = Math.min(level.getWidth() - 1, (int) Math.ceil((cameraX + viewWidthWorld) / tileWidth));
         int startY = Math.max(0, (int) Math.floor(cameraY / tileHeight));
@@ -2391,6 +2594,8 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
     private void drawEntities(@NonNull Canvas canvas, @NonNull LevelModel level) {
         float scale = currentScale > 0f ? currentScale : 1f;
+        float cameraX = this.cameraX + shakeOffsetX;
+        float cameraY = this.cameraY + shakeOffsetY;
         for (LevelModel.Entity entity : level.getEntities()) {
             String type = entity.getType();
             if (type == null || "spawn".equalsIgnoreCase(type)) {
@@ -2428,25 +2633,52 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     }
 
     private void drawHud(@NonNull Canvas canvas, @NonNull LevelModel level) {
+        float padding = 24f;
+        float timerSize = Math.max(30f, canvas.getWidth() * 0.03f);
+        timerPaint.setTextSize(timerSize);
+        String timerText = "Zeit " + TimeFormatter.format(Math.max(0f, runTimerSeconds));
+        float timerBaseline = padding + timerSize;
+        canvas.drawText(timerText, padding, timerBaseline, timerPaint);
+
+        float originalSize = textPaint.getTextSize();
+        textPaint.setTextSize(originalSize * 0.85f);
         String worldName = currentWorldInfo != null ? currentWorldInfo.getName()
                 : String.format(Locale.US, "World %d", currentWorldNumber);
         String header = String.format(Locale.US, "%s  (W%d-%d)", worldName, currentWorldNumber, currentStage);
-        canvas.drawText(header, 20f, SAFE_TOP_PX - 18f, textPaint);
-        String text = String.format(Locale.US, "x=%1$.0f  y=%2$.0f", player.x, player.y);
-        canvas.drawText(text, 20f, SAFE_TOP_PX + 12f, textPaint);
-        if (tileset != null && level.getTilesetAssetPath() != null && !level.getTilesetAssetPath().isEmpty()) {
-            canvas.drawText(level.getTilesetAssetPath(), 20f, SAFE_TOP_PX + 42f, textPaint);
+        float infoBaseline = timerBaseline + timerSize * 0.55f;
+        canvas.drawText(header, padding, infoBaseline, textPaint);
+        textPaint.setTextSize(originalSize);
+    }
+
+    private void drawBossMessage(@NonNull Canvas canvas) {
+        if (!bossMessageVisible) {
+            return;
         }
+        float fadeIn = Math.min(1f, bossMessageTimer / 0.4f);
+        float fadeOut = bossMessageTimer > (BOSS_MESSAGE_DURATION - BOSS_MESSAGE_FADE)
+                ? Math.max(0f, (BOSS_MESSAGE_DURATION - bossMessageTimer) / BOSS_MESSAGE_FADE)
+                : 1f;
+        float alphaFactor = Math.max(0f, Math.min(fadeIn, fadeOut));
+        int originalAlpha = bossTextPaint.getAlpha();
+        float baseSize = bossTextPaint.getTextSize();
+        bossTextPaint.setAlpha((int) (alphaFactor * 255));
+        float centerX = canvas.getWidth() / 2f;
+        float centerY = canvas.getHeight() * 0.28f;
+        canvas.drawText(BOSS_NAME + " ist aufgetaucht!", centerX, centerY, bossTextPaint);
+        bossTextPaint.setTextSize(baseSize * 0.55f);
+        canvas.drawText("Ein glühender Systemfehler jagt dich!", centerX, centerY + baseSize * 0.85f, bossTextPaint);
+        bossTextPaint.setTextSize(baseSize);
+        bossTextPaint.setAlpha(originalAlpha);
     }
 
     private float worldToScreenX(float worldX) {
         float scale = currentScale > 0f ? currentScale : 1f;
-        return (worldX - cameraX) * scale;
+        return (worldX - (cameraX + shakeOffsetX)) * scale;
     }
 
     private float worldToScreenY(float worldY) {
         float scale = currentScale > 0f ? currentScale : 1f;
-        return (worldY - cameraY) * scale;
+        return (worldY - (cameraY + shakeOffsetY)) * scale;
     }
 
     private void drawRobotSprite(@NonNull Canvas canvas,
