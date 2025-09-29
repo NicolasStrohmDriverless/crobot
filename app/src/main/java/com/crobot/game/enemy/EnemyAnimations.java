@@ -1,8 +1,13 @@
 package com.crobot.game.enemy;
 
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 
 import androidx.annotation.NonNull;
+
+import com.example.robotparkour.R;
 
 import java.util.Locale;
 
@@ -11,11 +16,13 @@ import java.util.Locale;
  */
 public final class EnemyAnimations {
 
+    private static Bitmap spamDroneBitmap;
+
     private EnemyAnimations() {
     }
 
     @NonNull
-    public static AnimatedEnemy create(@NonNull String typeName) {
+    public static AnimatedEnemy create(@NonNull Context context, @NonNull String typeName) {
         String key = typeName.toLowerCase(Locale.US);
         switch (key) {
             case "bugblob":
@@ -33,7 +40,7 @@ public final class EnemyAnimations {
             case "lag_bubble":
                 return new AnimatedEnemy(Color.parseColor("#BEE7FF"), Color.parseColor("#64B5F6"), 7f, 0.9f, 0.6f, false);
             case "spam_drone":
-                return new AnimatedEnemy(Color.parseColor("#FFB74D"), Color.parseColor("#FFF8E1"), 4f, 1.8f, 0.38f, true);
+                return AnimatedEnemy.forBitmap(getSpamDroneBitmap(context), 6f, 1.6f, true);
             case "port_plant":
                 return new AnimatedEnemy(Color.parseColor("#4CAF50"), Color.parseColor("#C8E6C9"), 3f, 1.2f, 0.45f, false);
             case "compile_crusher":
@@ -43,5 +50,13 @@ public final class EnemyAnimations {
             default:
                 return new AnimatedEnemy(Color.parseColor("#9FA8DA"), Color.parseColor("#FFFFFF"), 3f, 1.2f, 0.4f, true);
         }
+    }
+
+    @NonNull
+    private static synchronized Bitmap getSpamDroneBitmap(@NonNull Context context) {
+        if (spamDroneBitmap == null || spamDroneBitmap.isRecycled()) {
+            spamDroneBitmap = BitmapFactory.decodeResource(context.getResources(), R.drawable.spam_drone);
+        }
+        return spamDroneBitmap;
     }
 }

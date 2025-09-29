@@ -229,7 +229,9 @@ public final class DynamicLevelGenerator {
         builder.addSpike(1, 98f);
         builder.addSpike(2, 138f);
         builder.addEnemyHovering("glitch_saw", 2, 112f, 0.7f);
-        builder.addEnemyHovering("spam_drone", 1, 84f, 1.4f);
+        if (seedName.toLowerCase(Locale.US).contains("boss")) {
+            builder.addEnemyHovering("spam_drone", 1, 84f, 1.4f);
+        }
         builder.addEnemyOnFloor("compile_crusher", 2, 142f);
         builder.addEnemyOnFloor("bsod_block", 1, 150f);
     }

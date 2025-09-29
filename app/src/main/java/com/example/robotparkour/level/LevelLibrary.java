@@ -114,8 +114,6 @@ public final class LevelLibrary {
 
         builder.addEnemyOnFloor("phish_carp", 0, 48f);
         builder.addEnemyOnFloor("phish_carp", 0, 102f);
-        builder.addEnemyHovering("spam_drone", 1, 58f, 1.8f);
-        builder.addEnemyHovering("spam_drone", 2, 132f, 1.2f);
         builder.addEnemyHovering("cloud_leech", 2, 84f, 2.0f);
         builder.addEnemyHovering("cloud_leech", 1, 120f, 1.6f);
         builder.addEnemyOnFloor("adware_balloon", 1, 70f);

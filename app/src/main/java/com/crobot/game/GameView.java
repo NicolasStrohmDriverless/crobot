@@ -3100,7 +3100,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             this.leaderId = this.extras.get("leader");
             this.channel = this.extras.get("channel");
             this.trigger = this.extras.get("trigger");
-            this.animatedSprite = EnemyAnimations.create(kind.typeName);
+            this.animatedSprite = EnemyAnimations.create(getContext(), kind.typeName);
         }
 
         @NonNull

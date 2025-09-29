@@ -1,11 +1,14 @@
 package com.crobot.game.enemy;
 
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.graphics.RectF;
 
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 /**
  * Simple procedural sprite that provides a looping animation for enemies.
@@ -14,6 +17,10 @@ public final class AnimatedEnemy {
 
     private final Paint bodyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint accentPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    @Nullable
+    private final Bitmap bitmap;
+    @Nullable
+    private final Rect bitmapSrcRect;
     private final float bobAmplitude;
     private final float animationSpeed;
     private final float accentScale;
@@ -27,12 +34,32 @@ public final class AnimatedEnemy {
                          float animationSpeed,
                          float accentScale,
                          boolean horizontalWave) {
+        this(bodyColor, accentColor, bobAmplitude, animationSpeed, accentScale, horizontalWave, null);
+    }
+
+    private AnimatedEnemy(@ColorInt int bodyColor,
+                          @ColorInt int accentColor,
+                          float bobAmplitude,
+                          float animationSpeed,
+                          float accentScale,
+                          boolean horizontalWave,
+                          @Nullable Bitmap bitmap) {
         bodyPaint.setColor(bodyColor);
         accentPaint.setColor(accentColor);
         this.bobAmplitude = bobAmplitude;
         this.animationSpeed = animationSpeed;
         this.accentScale = accentScale;
         this.horizontalWave = horizontalWave;
+        this.bitmap = bitmap;
+        this.bitmapSrcRect = bitmap == null ? null : new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
+    }
+
+    @NonNull
+    public static AnimatedEnemy forBitmap(@NonNull Bitmap bitmap,
+                                          float bobAmplitude,
+                                          float animationSpeed,
+                                          boolean horizontalWave) {
+        return new AnimatedEnemy(0, 0, bobAmplitude, animationSpeed, 0f, horizontalWave, bitmap);
     }
 
     public void update(float deltaSeconds) {
@@ -48,6 +75,11 @@ public final class AnimatedEnemy {
         } else {
             animatedBounds.offset(0f, wobble);
         }
+        if (bitmap != null && bitmapSrcRect != null) {
+            canvas.drawBitmap(bitmap, bitmapSrcRect, animatedBounds, null);
+            return;
+        }
+
         canvas.drawRoundRect(animatedBounds, animatedBounds.height() * 0.35f,
                 animatedBounds.height() * 0.35f, bodyPaint);
 
