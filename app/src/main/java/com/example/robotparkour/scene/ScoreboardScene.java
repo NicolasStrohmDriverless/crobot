@@ -8,6 +8,7 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.ViewConfiguration;
 
 import com.crobot.game.level.LevelCatalog;
 import com.crobot.game.level.LevelDescriptor;
@@ -32,15 +33,22 @@ public class ScoreboardScene implements Scene {
     private final ScoreboardManager scoreboardManager;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF backButton = new RectF();
+    private final float touchSlop;
 
     private int surfaceWidth;
     private int surfaceHeight;
     private final List<LevelDescriptor> descriptors = new ArrayList<>();
     private Map<Integer, Float> bestTimes = new HashMap<>();
+    private float scrollOffset;
+    private float maxScroll;
+    private boolean dragging;
+    private float lastTouchY;
+    private float accumulatedDrag;
 
     public ScoreboardScene(Context context, SceneManager sceneManager) {
         this.sceneManager = sceneManager;
         this.scoreboardManager = sceneManager.getScoreboardManager();
+        this.touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
     }
 
     @Override
@@ -53,6 +61,9 @@ public class ScoreboardScene implements Scene {
         descriptors.clear();
         descriptors.addAll(LevelCatalog.getInstance(sceneManager.getContext()).getDescriptors());
         bestTimes = scoreboardManager.getAllBestTimes();
+        scrollOffset = 0f;
+        dragging = false;
+        accumulatedDrag = 0f;
     }
 
     @Override
@@ -83,15 +94,25 @@ public class ScoreboardScene implements Scene {
         float rightX = surfaceWidth * 0.84f;
         paint.setTextAlign(Paint.Align.LEFT);
 
+        float listBottom = backButton.top - surfaceHeight * 0.06f;
+        float availableHeight = Math.max(0f, listBottom - startY);
+        float contentHeight = descriptors.size() * lineHeight;
+        maxScroll = Math.max(0f, contentHeight - availableHeight);
+        scrollOffset = clamp(scrollOffset, 0f, maxScroll);
+        float drawY = startY - scrollOffset;
+
         if (descriptors.isEmpty()) {
             paint.setTextAlign(Paint.Align.CENTER);
-            canvas.drawText("Keine Welten gefunden.", surfaceWidth / 2f, startY, paint);
+            canvas.drawText("Keine Welten gefunden.", surfaceWidth / 2f, drawY, paint);
             paint.setTextAlign(Paint.Align.LEFT);
         } else {
             for (int i = 0; i < descriptors.size(); i++) {
                 LevelDescriptor descriptor = descriptors.get(i);
                 String title = String.format(Locale.getDefault(), "%d. %s", descriptor.getWorldNumber(), descriptor.getWorldInfo().getName());
-                float y = startY + i * lineHeight;
+                float y = drawY + i * lineHeight;
+                if (y < startY - lineHeight || y > listBottom + lineHeight) {
+                    continue;
+                }
                 paint.setTextAlign(Paint.Align.LEFT);
                 canvas.drawText(title, leftX, y, paint);
                 paint.setTextAlign(Paint.Align.RIGHT);
@@ -117,15 +138,37 @@ public class ScoreboardScene implements Scene {
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        if (event.getAction() == MotionEvent.ACTION_UP) {
-            float x = event.getX();
-            float y = event.getY();
-            if (backButton.contains(x, y)) {
-                sceneManager.switchTo(SceneType.MENU);
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                lastTouchY = event.getY();
+                accumulatedDrag = 0f;
+                dragging = true;
                 return true;
-            }
+            case MotionEvent.ACTION_MOVE:
+                if (!dragging) {
+                    return false;
+                }
+                float newY = event.getY();
+                float dy = newY - lastTouchY;
+                lastTouchY = newY;
+                scrollOffset = clamp(scrollOffset - dy, 0f, maxScroll);
+                accumulatedDrag += Math.abs(dy);
+                return true;
+            case MotionEvent.ACTION_UP:
+                float x = event.getX();
+                float y = event.getY();
+                boolean wasClick = accumulatedDrag < touchSlop;
+                dragging = false;
+                if (wasClick && backButton.contains(x, y)) {
+                    sceneManager.switchTo(SceneType.MENU);
+                }
+                return true;
+            case MotionEvent.ACTION_CANCEL:
+                dragging = false;
+                return true;
+            default:
+                return false;
         }
-        return true;
     }
 
     @Override
@@ -152,5 +195,15 @@ public class ScoreboardScene implements Scene {
     public boolean onBackPressed() {
         sceneManager.switchTo(SceneType.MENU);
         return true;
+    }
+
+    private float clamp(float value, float min, float max) {
+        if (value < min) {
+            return min;
+        }
+        if (value > max) {
+            return max;
+        }
+        return value;
     }
 }

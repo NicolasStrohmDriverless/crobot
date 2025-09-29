@@ -96,6 +96,8 @@ public final class WorldSelectorAdapter extends RecyclerView.Adapter<WorldSelect
     final class PageViewHolder extends RecyclerView.ViewHolder {
 
         private final GridLayout gridLayout;
+        @Nullable
+        private Runnable pendingRebind;
 
         PageViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -103,11 +105,26 @@ public final class WorldSelectorAdapter extends RecyclerView.Adapter<WorldSelect
         }
 
         void bind(@NonNull List<LevelDescriptor> levels, @Nullable WorldInfo activeWorld) {
+            if (pendingRebind != null) {
+                gridLayout.removeCallbacks(pendingRebind);
+                pendingRebind = null;
+            }
             gridLayout.removeAllViews();
             if (levels.isEmpty()) {
                 return;
             }
-            gridLayout.setColumnCount(2);
+            int availableWidth = gridLayout.getWidth();
+            if (availableWidth <= 0) {
+                pendingRebind = () -> bind(levels, activeWorld);
+                gridLayout.post(pendingRebind);
+                return;
+            }
+            Resources res = gridLayout.getResources();
+            int minButtonWidth = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 220,
+                    res.getDisplayMetrics());
+            int columns = Math.max(2, availableWidth / Math.max(minButtonWidth, 1));
+            columns = Math.min(columns, 3);
+            gridLayout.setColumnCount(columns);
             for (int i = 0; i < levels.size(); i++) {
                 LevelDescriptor descriptor = levels.get(i);
                 MaterialButton button = (MaterialButton) inflater.inflate(R.layout.item_level_button,
@@ -133,9 +150,9 @@ public final class WorldSelectorAdapter extends RecyclerView.Adapter<WorldSelect
                 button.setAlpha(isActive ? 1f : 0.9f);
                 GridLayout.LayoutParams params = new GridLayout.LayoutParams();
                 params.width = 0;
-                params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-                params.columnSpec = GridLayout.spec(i % 2, 1f);
-                params.rowSpec = GridLayout.spec(i / 2, 1f);
+                params.height = 0;
+                params.columnSpec = GridLayout.spec(i % columns, 1f);
+                params.rowSpec = GridLayout.spec(i / columns, 1f);
                 params.setMargins(buttonMarginPx, buttonMarginPx, buttonMarginPx, buttonMarginPx);
                 gridLayout.addView(button, params);
             }
