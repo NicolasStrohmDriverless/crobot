@@ -385,7 +385,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             if (kind == null) {
                 continue;
             }
-            AnimatedEnemy animatedSprite = EnemyAnimations.create(kind.typeName);
+            AnimatedEnemy animatedSprite = EnemyAnimations.create(getContext(), kind.typeName);
             EnemyInstance instance = new EnemyInstance(kind, entity.getX(), entity.getY(),
                     tileWidth, tileHeight, entity.getExtras(), animatedSprite);
             if (instance.kind == EnemyKind.PACKET_HOUND && !isBossWorld) {
