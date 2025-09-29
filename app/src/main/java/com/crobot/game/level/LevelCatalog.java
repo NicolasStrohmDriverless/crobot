@@ -13,10 +13,8 @@ import com.example.robotparkour.level.DynamicLevelGenerator;
 import com.example.robotparkour.level.LevelLibrary;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -26,6 +24,17 @@ import java.util.Locale;
 public final class LevelCatalog {
 
     private static final long MUSIC_LENGTH_THRESHOLD_BYTES = 160_000L;
+    private static final String[] ORDERED_TRACKS = new String[] {
+            "background",
+            "pointer_plains",
+            "lambda_gardens",
+            "namespace_nebula",
+            "template_temple",
+            "multithread_foundry",
+            "exception_volcano",
+            "heap_caverns",
+            "boss_fight"
+    };
 
     private static final Object LOCK = new Object();
     @Nullable
@@ -85,33 +94,16 @@ public final class LevelCatalog {
     private List<LevelDescriptor> loadDescriptors() {
         List<LevelDescriptor> list = new ArrayList<>();
         Resources resources = appContext.getResources();
-        Field[] fields = R.raw.class.getDeclaredFields();
-        List<Field> musicFields = new ArrayList<>();
-        for (Field field : fields) {
-            if (field.getType() != int.class) {
-                continue;
-            }
-            field.setAccessible(true);
-            int resId;
-            try {
-                resId = field.getInt(null);
-            } catch (IllegalAccessException ex) {
-                continue;
-            }
-            if (isMusicResource(resources, resId)) {
-                musicFields.add(field);
-            }
-        }
-        musicFields.sort(Comparator.comparing(Field::getName));
+        String packageName = appContext.getPackageName();
         int worldNumber = 1;
-        for (Field field : musicFields) {
-            int resId;
-            try {
-                resId = field.getInt(null);
-            } catch (IllegalAccessException ex) {
+        for (String entryName : ORDERED_TRACKS) {
+            int resId = resources.getIdentifier(entryName, "raw", packageName);
+            if (resId == 0) {
                 continue;
             }
-            String entryName = resources.getResourceEntryName(resId);
+            if (!isMusicResource(resources, resId)) {
+                continue;
+            }
             String displayName = toDisplayName(entryName);
             String description = buildDescription(entryName);
             WorldInfo worldInfo = new WorldInfo(worldNumber, displayName, description);

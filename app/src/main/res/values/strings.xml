@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">Robot IDE Parkour</string>
+    <string name="world_select_best_time">Bestzeit: %1$s</string>
+    <string name="world_select_best_time_placeholder">Bestzeit: —</string>
+    <string name="world_select_page_two">2. Seite</string>
+    <string name="world_select_page_three">3. Seite</string>
+    <string name="world_select_back">Back</string>
+    <string name="world_select_back_to_menu">Back</string>
 </resources>

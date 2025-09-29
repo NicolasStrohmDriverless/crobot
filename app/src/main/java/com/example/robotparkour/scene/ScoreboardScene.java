@@ -9,6 +9,8 @@ import android.graphics.RectF;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 
+import com.crobot.game.level.LevelCatalog;
+import com.crobot.game.level.LevelDescriptor;
 import com.example.robotparkour.core.Scene;
 import com.example.robotparkour.core.SceneManager;
 import com.example.robotparkour.core.SceneType;
@@ -16,7 +18,10 @@ import com.example.robotparkour.storage.ScoreboardManager;
 import com.example.robotparkour.util.TimeFormatter;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * Shows the best run times stored in {@link ScoreboardManager}.
@@ -30,7 +35,8 @@ public class ScoreboardScene implements Scene {
 
     private int surfaceWidth;
     private int surfaceHeight;
-    private List<Float> cachedTimes = new ArrayList<>();
+    private final List<LevelDescriptor> descriptors = new ArrayList<>();
+    private Map<Integer, Float> bestTimes = new HashMap<>();
 
     public ScoreboardScene(Context context, SceneManager sceneManager) {
         this.sceneManager = sceneManager;
@@ -44,7 +50,9 @@ public class ScoreboardScene implements Scene {
 
     @Override
     public void onEnter() {
-        cachedTimes = scoreboardManager.getTopTimes();
+        descriptors.clear();
+        descriptors.addAll(LevelCatalog.getInstance(sceneManager.getContext()).getDescriptors());
+        bestTimes = scoreboardManager.getAllBestTimes();
     }
 
     @Override
@@ -66,18 +74,32 @@ public class ScoreboardScene implements Scene {
         paint.setColor(Color.WHITE);
         paint.setTextAlign(Paint.Align.CENTER);
         paint.setTextSize(surfaceWidth * 0.07f);
-        canvas.drawText("Top Times", surfaceWidth / 2f, surfaceHeight * 0.18f, paint);
+        canvas.drawText("Bestzeiten", surfaceWidth / 2f, surfaceHeight * 0.18f, paint);
 
-        paint.setTextSize(surfaceWidth * 0.04f);
         float startY = surfaceHeight * 0.3f;
-        float lineHeight = paint.getTextSize() * 1.4f;
-        if (cachedTimes.isEmpty()) {
-            canvas.drawText("Run the parkour to record your best time!", surfaceWidth / 2f, startY, paint);
+        paint.setTextSize(surfaceWidth * 0.042f);
+        float lineHeight = paint.getTextSize() * 1.6f;
+        float leftX = surfaceWidth * 0.16f;
+        float rightX = surfaceWidth * 0.84f;
+        paint.setTextAlign(Paint.Align.LEFT);
+
+        if (descriptors.isEmpty()) {
+            paint.setTextAlign(Paint.Align.CENTER);
+            canvas.drawText("Keine Welten gefunden.", surfaceWidth / 2f, startY, paint);
+            paint.setTextAlign(Paint.Align.LEFT);
         } else {
-            for (int i = 0; i < cachedTimes.size(); i++) {
-                String line = String.format("%d. %s", i + 1, TimeFormatter.format(cachedTimes.get(i)));
-                canvas.drawText(line, surfaceWidth / 2f, startY + i * lineHeight, paint);
+            for (int i = 0; i < descriptors.size(); i++) {
+                LevelDescriptor descriptor = descriptors.get(i);
+                String title = String.format(Locale.getDefault(), "%d. %s", descriptor.getWorldNumber(), descriptor.getWorldInfo().getName());
+                float y = startY + i * lineHeight;
+                paint.setTextAlign(Paint.Align.LEFT);
+                canvas.drawText(title, leftX, y, paint);
+                paint.setTextAlign(Paint.Align.RIGHT);
+                Float best = bestTimes != null ? bestTimes.get(descriptor.getWorldNumber()) : null;
+                String timeText = best != null ? TimeFormatter.format(best) : "—";
+                canvas.drawText(timeText, rightX, y, paint);
             }
+            paint.setTextAlign(Paint.Align.LEFT);
         }
 
         drawButton(canvas, backButton, "Back");

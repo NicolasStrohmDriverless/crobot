@@ -25,9 +25,12 @@ import com.example.robotparkour.core.SceneType;
 import com.example.robotparkour.core.WorldInfo;
 import com.example.robotparkour.scene.adapter.WorldSelectorAdapter;
 import com.example.robotparkour.storage.WorldCompletionTracker;
+import com.google.android.material.button.MaterialButton;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Presents a Material-themed overlay for selecting the dynamically generated labyrinths.
@@ -52,8 +55,6 @@ public class WorldSelectScene implements Scene {
     @Nullable
     private View nextButton;
     @Nullable
-    private View closeButton;
-    @Nullable
     private WorldSelectorAdapter adapter;
 
     private final ViewPager2.OnPageChangeCallback pageChangeCallback = new ViewPager2.OnPageChangeCallback() {
@@ -68,6 +69,7 @@ public class WorldSelectScene implements Scene {
     private List<List<LevelDescriptor>> pages = new ArrayList<>();
     @Nullable
     private WorldInfo highlightedWorld;
+    private Map<Integer, Float> bestTimes = new HashMap<>();
 
     public WorldSelectScene(Context context,
                             SceneManager sceneManager,
@@ -103,6 +105,8 @@ public class WorldSelectScene implements Scene {
         if (adapter != null) {
             adapter.setHighlightedWorld(highlightedWorld);
         }
+        sceneManager.getAudioManager().setMusicTrack(R.raw.robot_cpp);
+        sceneManager.getAudioManager().startMusic();
     }
 
     @Override
@@ -156,11 +160,11 @@ public class WorldSelectScene implements Scene {
             indicatorContainer = overlayView.findViewById(R.id.pager_indicator);
             previousButton = overlayView.findViewById(R.id.button_previous);
             nextButton = overlayView.findViewById(R.id.button_next);
-            closeButton = overlayView.findViewById(R.id.button_close);
 
             adapter = new WorldSelectorAdapter(inflater, completionTracker, this::onLevelSelected);
             adapter.submitPages(pages);
             adapter.setHighlightedWorld(highlightedWorld);
+            adapter.setBestTimes(bestTimes);
 
             if (viewPager != null) {
                 viewPager.setAdapter(adapter);
@@ -168,13 +172,10 @@ public class WorldSelectScene implements Scene {
                 viewPager.setOffscreenPageLimit(1);
             }
             if (previousButton != null) {
-                previousButton.setOnClickListener(v -> navigateBy(-1));
+                previousButton.setOnClickListener(v -> handlePrevious());
             }
             if (nextButton != null) {
                 nextButton.setOnClickListener(v -> navigateBy(1));
-            }
-            if (closeButton != null) {
-                closeButton.setOnClickListener(v -> sceneManager.switchTo(SceneType.MENU));
             }
             buildIndicators();
             int initialPage = highlightedWorld != null ? findPageIndex(highlightedWorld) : 0;
@@ -203,13 +204,17 @@ public class WorldSelectScene implements Scene {
     private void reloadLevels() {
         LevelCatalog catalog = LevelCatalog.getInstance(appContext);
         descriptors = catalog.getDescriptors();
-        pages = new ArrayList<>();
-        if (descriptors != null && !descriptors.isEmpty()) {
-            pages.add(new ArrayList<>(descriptors));
+        pages = paginateDescriptors(descriptors);
+        Map<Integer, Float> storedTimes = sceneManager.getScoreboardManager().getAllBestTimes();
+        if (storedTimes == null) {
+            bestTimes = new HashMap<>();
+        } else {
+            bestTimes = new HashMap<>(storedTimes);
         }
         if (adapter != null) {
             adapter.submitPages(pages);
             adapter.setHighlightedWorld(highlightedWorld);
+            adapter.setBestTimes(bestTimes);
         }
         buildIndicators();
     }
@@ -266,17 +271,29 @@ public class WorldSelectScene implements Scene {
     private void updateNavigationButtons(int position) {
         int lastIndex = Math.max(0, pages.size() - 1);
         boolean allowPaging = pages.size() > 1;
+        boolean hasPages = !pages.isEmpty();
         if (previousButton != null) {
-            boolean enabled = allowPaging && position > 0;
-            previousButton.setEnabled(enabled);
-            previousButton.setAlpha(enabled ? 1f : 0.4f);
-            previousButton.setVisibility(allowPaging ? View.VISIBLE : View.GONE);
+            previousButton.setVisibility(hasPages ? View.VISIBLE : View.GONE);
+            previousButton.setEnabled(hasPages);
+            if (previousButton instanceof MaterialButton) {
+                MaterialButton button = (MaterialButton) previousButton;
+                int textRes = position == 0 ? R.string.world_select_back_to_menu : R.string.world_select_back;
+                button.setText(textRes);
+            }
         }
         if (nextButton != null) {
-            boolean enabled = allowPaging && position < lastIndex;
-            nextButton.setEnabled(enabled);
-            nextButton.setAlpha(enabled ? 1f : 0.4f);
-            nextButton.setVisibility(allowPaging ? View.VISIBLE : View.GONE);
+            if (!allowPaging || position >= lastIndex) {
+                nextButton.setVisibility(View.GONE);
+                nextButton.setEnabled(false);
+            } else {
+                nextButton.setVisibility(View.VISIBLE);
+                nextButton.setEnabled(true);
+                if (nextButton instanceof MaterialButton) {
+                    MaterialButton button = (MaterialButton) nextButton;
+                    int textRes = position == 0 ? R.string.world_select_page_two : R.string.world_select_page_three;
+                    button.setText(textRes);
+                }
+            }
         }
     }
 
@@ -291,5 +308,39 @@ public class WorldSelectScene implements Scene {
             }
         }
         return 0;
+    }
+
+    private void handlePrevious() {
+        if (viewPager == null) {
+            sceneManager.switchTo(SceneType.MENU);
+            return;
+        }
+        int current = viewPager.getCurrentItem();
+        if (current <= 0) {
+            sceneManager.switchTo(SceneType.MENU);
+        } else {
+            viewPager.setCurrentItem(current - 1, true);
+        }
+    }
+
+    private List<List<LevelDescriptor>> paginateDescriptors(List<LevelDescriptor> descriptors) {
+        List<List<LevelDescriptor>> result = new ArrayList<>();
+        if (descriptors == null || descriptors.isEmpty()) {
+            return result;
+        }
+        int index = 0;
+        int[] firstPages = new int[] {4, 4};
+        for (int size : firstPages) {
+            if (index >= descriptors.size()) {
+                break;
+            }
+            int end = Math.min(descriptors.size(), index + size);
+            result.add(new ArrayList<>(descriptors.subList(index, end)));
+            index = end;
+        }
+        if (index < descriptors.size()) {
+            result.add(new ArrayList<>(descriptors.subList(index, descriptors.size())));
+        }
+        return result;
     }
 }
