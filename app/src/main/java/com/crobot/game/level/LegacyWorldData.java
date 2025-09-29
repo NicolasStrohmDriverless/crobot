@@ -43,15 +43,17 @@ public final class LegacyWorldData {
         if (info == null) {
             return null;
         }
-        String[] rows = LevelLibrary.getLevelData(info);
+        LevelLibrary.LegacyLevelBlueprint blueprint = LevelLibrary.getLevelBlueprint(info);
+        String[] rows = blueprint.getRows();
         if (rows == null || rows.length == 0) {
             return null;
         }
-        return convertToLevelModel(rows);
+        return convertToLevelModel(rows, blueprint.getEntities());
     }
 
     @NonNull
-    private static LevelModel convertToLevelModel(@NonNull String[] rows) {
+    private static LevelModel convertToLevelModel(@NonNull String[] rows,
+                                                  @NonNull List<LevelLibrary.EntitySpec> extraEntities) {
         int height = rows.length;
         int width = 0;
         for (String row : rows) {
@@ -79,6 +81,14 @@ public final class LegacyWorldData {
         collisionFlags[gidFor('G')] = 0x1;
         collisionFlags[gidFor('B')] = 0x1;
         collisionFlags[gidFor('Q')] = 0x1;
+
+        if (!extraEntities.isEmpty()) {
+            for (LevelLibrary.EntitySpec spec : extraEntities) {
+                if (spec != null) {
+                    entities.add(spec.toLevelEntity());
+                }
+            }
+        }
 
         TileLayer layer = new TileLayer("ground", width, height, tileData);
         CollisionMap collisionMap = new CollisionMap(collisionFlags);
@@ -134,15 +144,10 @@ public final class LegacyWorldData {
     @NonNull
     private static Map<Integer, WorldInfo> createWorldInfoMap() {
         Map<Integer, WorldInfo> map = new HashMap<>();
-        map.put(1, new WorldInfo(1, "Pointer Plains", "Startwelt, leicht & freundlich"));
-        map.put(2, new WorldInfo(2, "Template Temple", "komplex, verschachtelt"));
-        map.put(3, new WorldInfo(3, "Namespace Nebula", "spacey, schwebend"));
-        map.put(4, new WorldInfo(4, "Exception Volcano", "heiß, leicht bedrohlich – kein Boss, nur Spannung"));
-        map.put(5, new WorldInfo(5, "STL City", "geschäftig, groovy"));
-        map.put(6, new WorldInfo(6, "Heap Caverns", "dunkel, hohl, vorsichtig"));
-        map.put(7, new WorldInfo(7, "Lambda Gardens", "verspielt, naturhaft, \"funky nerdy\""));
-        map.put(8, new WorldInfo(8, "Multithread Foundry", "antriebsstark, mechanisch"));
-        map.put(9, new WorldInfo(9, "NullPointer-Nexus", "Der Kernel-Kerker"));
+        map.put(1, new WorldInfo(1, "Recycle-Bin-Ravine", "Aufräumen im Daten-Canyon"));
+        map.put(2, new WorldInfo(2, "Phishing-Lagune", "Täuschungen zwischen Mail-Wellen"));
+        map.put(3, new WorldInfo(3, "Kernel-Katakomben", "Schalterrätsel im Systemkern"));
+        map.put(4, new WorldInfo(4, "Cloud-Zitadelle", "Schweben zwischen Debug-Wolken"));
         return map;
     }
 }

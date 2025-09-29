@@ -25,8 +25,8 @@ import java.util.List;
  */
 public class WorldSelectScene implements Scene {
 
-    private static final int GRID_COLUMNS = 3;
-    private static final int GRID_ROWS = 3;
+    private static final int GRID_COLUMNS = 2;
+    private static final int GRID_ROWS = 2;
     private static final float CARD_ASPECT_RATIO = 0.88f;
     private static final float CELL_INNER_PADDING = 0.18f;
 
@@ -75,57 +75,27 @@ public class WorldSelectScene implements Scene {
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         1,
-                        "Pointer Plains",
-                        "Startwelt, leicht & freundlich"),
-                0, 0, -0.12f, 0.08f, 1.08f));
+                        "Recycle-Bin-Ravine",
+                        "Aufräumen im Daten-Canyon"),
+                0, 0, -0.10f, 0.06f, 1.08f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         2,
-                        "Template Temple",
-                        "komplex, verschachtelt"),
-                1, 0, -0.18f, -0.05f, 1.04f));
+                        "Phishing-Lagune",
+                        "Täuschungen zwischen Mail-Wellen"),
+                1, 0, 0.08f, -0.04f, 1.05f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         3,
-                        "Namespace Nebula",
-                        "spacey, schwebend"),
-                2, 0, 0.10f, 0.04f, 1.02f));
+                        "Kernel-Katakomben",
+                        "Schalterrätsel im Systemkern"),
+                0, 1, -0.12f, 0.10f, 1.07f));
         worldCards.add(new WorldCard(
                 new WorldInfo(
                         4,
-                        "Exception Volcano",
-                        "heiß, leicht bedrohlich – kein Boss, nur Spannung"),
-                2, 1, 0.14f, -0.12f, 1.08f));
-        worldCards.add(new WorldCard(
-                new WorldInfo(
-                        5,
-                        "STL City",
-                        "geschäftig, groovy"),
-                2, 2, 0.12f, 0.10f, 1.04f));
-        worldCards.add(new WorldCard(
-                new WorldInfo(
-                        6,
-                        "Heap Caverns",
-                        "dunkel, hohl, vorsichtig"),
-                1, 2, 0.16f, 0.06f, 1.06f));
-        worldCards.add(new WorldCard(
-                new WorldInfo(
-                        7,
-                        "Lambda Gardens",
-                        "verspielt, naturhaft, \"funky nerdy\""),
-                0, 2, -0.08f, -0.10f, 1.14f));
-        worldCards.add(new WorldCard(
-                new WorldInfo(
-                        8,
-                        "Multithread Foundry",
-                        "antriebsstark, mechanisch"),
-                0, 1, -0.14f, 0.06f, 1.00f));
-        worldCards.add(new WorldCard(
-                new WorldInfo(
-                        9,
-                        "NullPointer-Nexus",
-                        "Der Kernel-Kerker"),
-                1, 1, 0.02f, 0.12f, 1.26f));
+                        "Cloud-Zitadelle",
+                        "Schweben zwischen Debug-Wolken"),
+                1, 1, 0.10f, 0.12f, 1.12f));
     }
 
     @Override

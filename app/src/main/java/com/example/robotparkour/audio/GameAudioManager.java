@@ -35,7 +35,7 @@ public class GameAudioManager {
         createSoundPool();
         loadEffects();
         currentMusicResId = 0;
-        setMusicTrack(R.raw.background);
+        setMusicTrack(R.raw.robot_cpp);
     }
 
     private void createSoundPool() {
@@ -121,7 +121,7 @@ public class GameAudioManager {
             return;
         }
         if (mediaPlayer == null) {
-            setMusicTrack(R.raw.background);
+            setMusicTrack(R.raw.robot_cpp);
         }
         if (mediaPlayer == null) {
             return;

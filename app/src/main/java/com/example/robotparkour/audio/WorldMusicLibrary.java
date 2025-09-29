@@ -23,25 +23,21 @@ public final class WorldMusicLibrary {
     @RawRes
     public static int getTrackFor(WorldInfo worldInfo) {
         if (worldInfo == null) {
-            return R.raw.background;
+            return R.raw.robot_cpp;
         }
         Integer resId = MUSIC_BY_PROGRAM.get(worldInfo.getProgramNumber());
         if (resId != null) {
             return resId;
         }
-        return R.raw.background;
+        return R.raw.robot_cpp;
     }
 
     private static Map<Integer, Integer> createProgramMap() {
         Map<Integer, Integer> map = new HashMap<>();
-        map.put(1, R.raw.pointer_plains);
+        map.put(1, R.raw.robot_cpp);
         map.put(2, R.raw.template_temple);
         map.put(3, R.raw.namespace_nebula);
-        map.put(4, R.raw.exception_volcano);
-        map.put(5, R.raw.stl_city);
-        map.put(6, R.raw.heap_caverns);
-        map.put(7, R.raw.lambda_gardens);
-        map.put(8, R.raw.multithread_foundry);
+        map.put(4, R.raw.boss_fight);
         return map;
     }
 }
