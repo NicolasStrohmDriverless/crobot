@@ -293,7 +293,7 @@ public final class LevelLibrary {
             }
         }
 
-        LevelModel.Entity toLevelEntity() {
+        public LevelModel.Entity toLevelEntity() {
             int pixelX = Math.round((tileX + offsetX) * TILE_SIZE);
             int pixelY = Math.round((tileY + offsetY) * TILE_SIZE);
             return new LevelModel.Entity(type, pixelX, pixelY, extras);

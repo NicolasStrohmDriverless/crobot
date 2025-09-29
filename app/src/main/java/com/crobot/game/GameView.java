@@ -156,6 +156,8 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
     private boolean duckPressed;
     private boolean playerRespawnedThisFrame;
 
+    private float previousVx;
+
     private float cameraX;
     private float cameraY;
     private float currentScale = 1f;
@@ -226,8 +228,8 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         animationTimer = 0f;
         player.width = level.getTileWidth() * 0.82f;
         player.height = level.getTileHeight() * 1.65f;
-        float previousVx = player.vx;
         player.vx = 0f;
+        previousVx = 0f;
         player.vy = 0f;
         player.onGround = false;
         player.facingRight = true;
@@ -1079,6 +1081,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         }
         playerRespawnedThisFrame = true;
         player.respawn();
+        previousVx = 0f;
         lastPlayerAction = PlayerAction.IDLE;
     }
 
@@ -1585,6 +1588,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             action = PlayerAction.JUMP;
         }
         lastPlayerAction = action;
+        previousVx = player.vx;
     }
 
     private void applyPhysics(float deltaSeconds, @NonNull LevelModel level) {
