@@ -4,6 +4,7 @@ package com.example.robotparkour.scene;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.view.ContextThemeWrapper;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -76,7 +77,8 @@ public class WorldSelectScene implements Scene {
         this.appContext = context.getApplicationContext();
         this.sceneManager = sceneManager;
         this.completionTracker = completionTracker;
-        this.inflater = LayoutInflater.from(context);
+        Context overlayContext = new ContextThemeWrapper(context, R.style.Theme_RobotIdeParkour);
+        this.inflater = LayoutInflater.from(overlayContext);
         reloadLevels();
     }
 
