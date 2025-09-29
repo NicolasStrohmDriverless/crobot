@@ -16,7 +16,6 @@
     app:iconGravity="textStart"
     app:iconPadding="12dp"
     app:iconTint="@android:color/white"
-    app:checkedIconGravity="textStart"
     app:rippleColor="@color/accent_blue"
     app:strokeColor="@color/accent_blue"
     app:strokeWidth="1dp"
