@@ -4,10 +4,9 @@ package com.example.robotparkour.storage;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
 /**
  * Persists the player's best completion times so they survive app restarts.
@@ -15,8 +14,7 @@ import java.util.Locale;
 public class ScoreboardManager {
 
     private static final String PREFS_NAME = "robot_parkour_scores";
-    private static final String KEY_TIMES = "times";
-    private static final int MAX_ENTRIES = 10;
+    private static final String KEY_PREFIX = "best_time_world_";
 
     private final SharedPreferences preferences;
 
@@ -24,53 +22,63 @@ public class ScoreboardManager {
         preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
 
-    public synchronized void submitTime(float seconds) {
-        List<Float> times = loadTimes();
-        times.add(seconds);
-        Collections.sort(times);
-        if (times.size() > MAX_ENTRIES) {
-            times = new ArrayList<>(times.subList(0, MAX_ENTRIES));
+    public synchronized void submitTime(int worldNumber, float seconds) {
+        if (worldNumber <= 0) {
+            return;
         }
-        saveTimes(times);
+        Float current = getBestTime(worldNumber);
+        if (current == null || seconds < current) {
+            preferences.edit().putFloat(keyFor(worldNumber), seconds).apply();
+        }
     }
 
-    public synchronized List<Float> getTopTimes() {
-        return loadTimes();
+    public synchronized Float getBestTime(int worldNumber) {
+        float stored = preferences.getFloat(keyFor(worldNumber), -1f);
+        return stored > 0f ? stored : null;
     }
 
     public synchronized void clear() {
-        preferences.edit().remove(KEY_TIMES).apply();
-    }
-
-    private List<Float> loadTimes() {
-        String raw = preferences.getString(KEY_TIMES, "");
-        List<Float> result = new ArrayList<>();
-        if (raw == null || raw.isEmpty()) {
-            return result;
-        }
-        String[] pieces = raw.split(",");
-        for (String piece : pieces) {
-            try {
-                result.add(Float.parseFloat(piece));
-            } catch (NumberFormatException ignored) {
-                // Skip malformed entries.
+        SharedPreferences.Editor editor = preferences.edit();
+        Map<String, ?> all = preferences.getAll();
+        Iterator<String> iterator = all.keySet().iterator();
+        while (iterator.hasNext()) {
+            String key = iterator.next();
+            if (key.startsWith(KEY_PREFIX)) {
+                editor.remove(key);
             }
         }
-        Collections.sort(result);
-        if (result.size() > MAX_ENTRIES) {
-            return new ArrayList<>(result.subList(0, MAX_ENTRIES));
+        editor.apply();
+    }
+
+    public synchronized Map<Integer, Float> getAllBestTimes() {
+        Map<Integer, Float> result = new HashMap<>();
+        Map<String, ?> all = preferences.getAll();
+        for (Map.Entry<String, ?> entry : all.entrySet()) {
+            String key = entry.getKey();
+            if (!key.startsWith(KEY_PREFIX)) {
+                continue;
+            }
+            Object value = entry.getValue();
+            if (!(value instanceof Float)) {
+                continue;
+            }
+            int world = parseWorldNumber(key);
+            if (world > 0) {
+                result.put(world, (Float) value);
+            }
         }
         return result;
     }
 
-    private void saveTimes(List<Float> times) {
-        StringBuilder builder = new StringBuilder();
-        for (int i = 0; i < times.size(); i++) {
-            if (i > 0) {
-                builder.append(',');
-            }
-            builder.append(String.format(Locale.US, "%.3f", times.get(i)));
+    private String keyFor(int worldNumber) {
+        return KEY_PREFIX + worldNumber;
+    }
+
+    private int parseWorldNumber(String key) {
+        try {
+            return Integer.parseInt(key.substring(KEY_PREFIX.length()));
+        } catch (NumberFormatException | IndexOutOfBoundsException ex) {
+            return -1;
         }
-        preferences.edit().putString(KEY_TIMES, builder.toString()).apply();
     }
 }

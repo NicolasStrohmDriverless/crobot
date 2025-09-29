@@ -150,7 +150,10 @@ public class SceneManager {
 
     public void showGameOver(GameResult result) {
         if (result != null && result.isVictory()) {
-            scoreboardManager.submitTime(result.getTimeSeconds());
+            WorldInfo world = selectedWorld;
+            if (world != null) {
+                scoreboardManager.submitTime(world.getProgramNumber(), result.getTimeSeconds());
+            }
         }
         if (gameOverScene != null) {
             gameOverScene.setResult(result);

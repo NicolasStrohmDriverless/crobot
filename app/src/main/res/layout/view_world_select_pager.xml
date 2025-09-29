@@ -67,23 +67,7 @@
                 app:icon="@drawable/ic_chevron_left"
                 app:iconPadding="0dp"
                 app:iconTint="@android:color/white"
-                android:text="Zurück"
-                android:textColor="@android:color/white" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/button_next"
-                style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
-                android:padding="12dp"
-                app:cornerRadius="24dp"
-                app:icon="@drawable/ic_chevron_right"
-                app:iconPadding="0dp"
-                app:iconTint="@android:color/white"
-                android:text="Weiter"
+                android:text="@string/world_select_back_to_menu"
                 android:textColor="@android:color/white" />
 
             <View
@@ -92,14 +76,19 @@
                 android:layout_weight="1" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/button_close"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:id="@+id/button_next"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Zur Karte"
-                android:textColor="@android:color/white"
-                app:strokeColor="@android:color/white"
-                app:strokeWidth="1dp" />
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="12dp"
+                app:cornerRadius="24dp"
+                app:icon="@drawable/ic_chevron_right"
+                app:iconPadding="0dp"
+                app:iconTint="@android:color/white"
+                android:text="@string/world_select_page_two"
+                android:textColor="@android:color/white" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>

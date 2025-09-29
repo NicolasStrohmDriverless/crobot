@@ -10,6 +10,7 @@ import android.graphics.RectF;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 
+import com.example.robotparkour.R;
 import com.example.robotparkour.core.Scene;
 import com.example.robotparkour.core.SceneManager;
 import com.example.robotparkour.core.SceneType;
@@ -71,6 +72,7 @@ public class MenuScene implements Scene {
 
     @Override
     public void onEnter() {
+        sceneManager.getAudioManager().setMusicTrack(R.raw.robot_cpp);
         sceneManager.getAudioManager().startMusic();
         resetStory();
     }
