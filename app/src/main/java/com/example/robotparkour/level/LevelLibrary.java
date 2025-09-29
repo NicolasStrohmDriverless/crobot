@@ -58,6 +58,12 @@ public final class LevelLibrary {
         return entities;
     }
 
+    @NonNull
+    public static LegacyLevelBlueprint createBlueprint(@NonNull String[] rows,
+                                                       @NonNull List<EntitySpec> entities) {
+        return new LegacyLevelBlueprint(rows, entities);
+    }
+
     private static LegacyLevelBlueprint buildRecycleBinRavine() {
         LevelBuilder builder = new LevelBuilder(LEVEL_WIDTH);
         applyBaseLayout(builder, 'G', 'B', 'Q');

@@ -51,6 +51,7 @@ public final class LevelRepository {
 
     public LevelRepository(@NonNull Context context) {
         this.appContext = context.getApplicationContext();
+        LegacyWorldData.initialize(appContext);
         ensureNativeInitialised();
     }
 

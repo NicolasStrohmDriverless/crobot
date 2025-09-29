@@ -6,6 +6,10 @@ import android.graphics.Canvas;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 
+import androidx.annotation.Nullable;
+
+import com.crobot.game.level.LevelCatalog;
+import com.crobot.game.level.LevelDescriptor;
 import com.crobot.game.ui.MenuIntegration;
 import com.example.robotparkour.audio.GameAudioManager;
 import com.example.robotparkour.scene.GameOverScene;
@@ -19,6 +23,7 @@ import com.example.robotparkour.storage.WorldCompletionTracker;
 import com.example.robotparkour.util.GameResult;
 
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -44,6 +49,7 @@ public class SceneManager {
     private WorldSelectScene worldSelectScene;
 
     private WorldInfo selectedWorld;
+    private SceneOverlayHost overlayHost;
 
     public SceneManager(Context context,
                         GameView gameView,
@@ -75,9 +81,16 @@ public class SceneManager {
 
         worldSelectScene = new WorldSelectScene(appContext, this, completionTracker);
         registerScene(worldSelectScene);
+        worldSelectScene.setOverlayHost(overlayHost);
 
         if (selectedWorld == null) {
-            selectedWorld = new WorldInfo(1, "Pointer Plains", "Startwelt, leicht & freundlich");
+            LevelCatalog catalog = LevelCatalog.getInstance(appContext);
+            List<LevelDescriptor> descriptors = catalog.getDescriptors();
+            if (!descriptors.isEmpty()) {
+                selectedWorld = descriptors.get(0).getWorldInfo();
+            } else {
+                selectedWorld = new WorldInfo(1, "Pointer Plains", "Startwelt, leicht & freundlich");
+            }
         }
 
         switchTo(SceneType.MENU);
@@ -203,5 +216,17 @@ public class SceneManager {
 
     public WorldInfo getSelectedWorld() {
         return selectedWorld;
+    }
+
+    public void setOverlayHost(@Nullable SceneOverlayHost host) {
+        overlayHost = host;
+        if (worldSelectScene != null) {
+            worldSelectScene.setOverlayHost(host);
+        }
+    }
+
+    @Nullable
+    public SceneOverlayHost getOverlayHost() {
+        return overlayHost;
     }
 }
