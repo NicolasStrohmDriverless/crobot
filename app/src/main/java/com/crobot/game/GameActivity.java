@@ -76,7 +76,6 @@ public class GameActivity extends AppCompatActivity {
         View left = findViewById(R.id.button_left);
         View right = findViewById(R.id.button_right);
         View jump = findViewById(R.id.button_jump);
-        View duck = findViewById(R.id.button_duck);
 
         View.OnTouchListener listener = (view, motionEvent) -> {
             int id = view.getId();
@@ -86,8 +85,6 @@ public class GameActivity extends AppCompatActivity {
                 gameView.handleButtonTouch(GameView.Control.RIGHT, motionEvent);
             } else if (id == R.id.button_jump) {
                 gameView.handleButtonTouch(GameView.Control.JUMP, motionEvent);
-            } else if (id == R.id.button_duck) {
-                gameView.handleButtonTouch(GameView.Control.DUCK, motionEvent);
             }
             return true;
         };
@@ -95,7 +92,6 @@ public class GameActivity extends AppCompatActivity {
         left.setOnTouchListener(listener);
         right.setOnTouchListener(listener);
         jump.setOnTouchListener(listener);
-        duck.setOnTouchListener(listener);
     }
 
     private void loadLevel(int world, int stage) {
