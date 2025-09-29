@@ -2,14 +2,19 @@
 package com.example.robotparkour;
 
 import android.os.Bundle;
+import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.crobot.game.ui.MenuIntegration;
+import com.example.robotparkour.R;
+import com.example.robotparkour.core.SceneOverlayHost;
 import com.example.robotparkour.core.GameView;
 
 /**
@@ -18,6 +23,8 @@ import com.example.robotparkour.core.GameView;
 public class MainActivity extends AppCompatActivity {
 
     private GameView gameView;
+    private ViewGroup overlayContainer;
+    private SceneOverlayHost overlayHost;
     private OnBackPressedCallback backPressedCallback;
 
     @Override
@@ -30,7 +37,42 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
         gameView = findViewById(R.id.game_view);
+        overlayContainer = findViewById(R.id.overlay_container);
         MenuIntegration.registerHost(this);
+
+        if (gameView != null) {
+            overlayHost = new SceneOverlayHost() {
+                @Override
+                public android.content.Context getContext() {
+                    return MainActivity.this;
+                }
+
+                @Override
+                public void showOverlay(@NonNull View view) {
+                    if (overlayContainer == null) {
+                        return;
+                    }
+                    if (view.getLayoutParams() == null) {
+                        view.setLayoutParams(new ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT));
+                    }
+                    if (view.getParent() != overlayContainer) {
+                        overlayContainer.addView(view);
+                    }
+                    view.setVisibility(View.VISIBLE);
+                }
+
+                @Override
+                public void removeOverlay(@NonNull View view) {
+                    if (overlayContainer == null) {
+                        return;
+                    }
+                    overlayContainer.removeView(view);
+                }
+            };
+            gameView.getSceneManager().setOverlayHost(overlayHost);
+        }
 
         backPressedCallback = new OnBackPressedCallback(true) {
             @Override
@@ -65,6 +107,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         if (gameView != null) {
             gameView.releaseResources();
+            gameView.getSceneManager().setOverlayHost(null);
         }
         MenuIntegration.unregisterHost(this);
         if (backPressedCallback != null) {

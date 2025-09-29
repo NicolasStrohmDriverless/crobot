@@ -89,7 +89,7 @@ public class GameScene implements Scene {
 
     public void resetForNewRun() {
         ensureLevelForSelectedWorld();
-        audioManager.setMusicTrack(WorldMusicLibrary.getTrackFor(sceneManager.getSelectedWorld()));
+        audioManager.setMusicTrack(WorldMusicLibrary.getTrackFor(sceneManager.getContext(), sceneManager.getSelectedWorld()));
         elapsedSeconds = 0f;
         collectedCoins = 0;
         lives = INITIAL_LIVES;
@@ -150,7 +150,7 @@ public class GameScene implements Scene {
     public void onEnter() {
         running = true;
         ensureLevelForSelectedWorld();
-        audioManager.setMusicTrack(WorldMusicLibrary.getTrackFor(sceneManager.getSelectedWorld()));
+        audioManager.setMusicTrack(WorldMusicLibrary.getTrackFor(sceneManager.getContext(), sceneManager.getSelectedWorld()));
         audioManager.startMusic();
     }
 

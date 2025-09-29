@@ -19,6 +19,8 @@ import android.view.SurfaceView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.crobot.game.enemy.AnimatedEnemy;
+import com.crobot.game.enemy.EnemyAnimations;
 import com.crobot.game.level.LegacyWorldData;
 import com.crobot.game.level.LevelModel;
 import com.example.robotparkour.audio.GameAudioManager;
@@ -320,7 +322,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
 
     private void configureMusic() {
         audioManager.stopMusic();
-        audioManager.setMusicTrack(WorldMusicLibrary.getTrackFor(currentWorldInfo));
+        audioManager.setMusicTrack(WorldMusicLibrary.getTrackFor(getContext(), currentWorldInfo));
         audioManager.startMusic();
     }
 
@@ -371,6 +373,9 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             if (!enemy.active) {
                 iterator.remove();
                 continue;
+            }
+            if (enemy.animatedSprite != null) {
+                enemy.animatedSprite.update(deltaSeconds);
             }
             enemy.timer += deltaSeconds;
             enemy.stateTimer += deltaSeconds;
@@ -1114,6 +1119,17 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                                  float top,
                                  float right,
                                  float bottom) {
+        AnimatedEnemy sprite = enemy.animatedSprite;
+        if (sprite != null) {
+            tempRectF.set(left, top, right, bottom);
+            sprite.draw(canvas, tempRectF);
+            if (!enemy.visible) {
+                entityPaint.setColor(Color.argb(100, 255, 255, 255));
+                canvas.drawRoundRect(tempRectF, tempRectF.height() * 0.35f,
+                        tempRectF.height() * 0.35f, entityPaint);
+            }
+            return;
+        }
         int color;
         switch (enemy.kind) {
             case BUGBLOB:
@@ -2684,12 +2700,23 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                 break;
             case JUMP:
                 jumpPressed = pressed;
+                if (pressed) {
+                    duckPressed = false;
+                    LevelModel currentLevel = this.level;
+                    if (currentLevel != null) {
+                        tryStand(currentLevel);
+                    }
+                }
                 if (!pressed) {
                     jumpConsumed = false;
                 }
                 break;
             case DUCK:
                 duckPressed = pressed;
+                if (pressed) {
+                    jumpPressed = false;
+                    jumpConsumed = true;
+                }
                 if (!pressed) {
                     LevelModel currentLevel = this.level;
                     if (currentLevel != null) {
@@ -2809,6 +2836,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
         String channel;
         String trigger;
         Map<String, String> extras;
+        AnimatedEnemy animatedSprite;
 
         EnemyInstance(@NonNull EnemyKind kind,
                       float pixelX,
@@ -2840,6 +2868,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             this.leaderId = this.extras.get("leader");
             this.channel = this.extras.get("channel");
             this.trigger = this.extras.get("trigger");
+            this.animatedSprite = EnemyAnimations.create(kind.typeName);
         }
 
         @NonNull

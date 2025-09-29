@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:keepScreenOn="true">
@@ -48,38 +49,38 @@
             android:gravity="center_horizontal"
             android:orientation="vertical">
 
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="center_horizontal"
-                android:orientation="horizontal">
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_left"
+                android:layout_width="96dp"
+                android:layout_height="72dp"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/bg_control_button_selector"
+                android:minHeight="64dp"
+                android:minWidth="64dp"
+                android:text="RUN"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                app:icon="@drawable/ic_run_left"
+                app:iconGravity="textTop"
+                app:iconPadding="8dp"
+                app:iconTint="@android:color/white" />
 
-                <Button
-                    android:id="@+id/button_left"
-                    android:layout_width="72dp"
-                    android:layout_height="72dp"
-                    android:layout_marginEnd="16dp"
-                    android:backgroundTint="#AAFFFFFF"
-                    android:text="◀"
-                    android:textSize="28sp" />
-
-                <Button
-                    android:id="@+id/button_right"
-                    android:layout_width="72dp"
-                    android:layout_height="72dp"
-                    android:backgroundTint="#AAFFFFFF"
-                    android:text="▶"
-                    android:textSize="28sp" />
-            </LinearLayout>
-
-            <Button
-                android:id="@+id/button_duck"
-                android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:layout_marginTop="12dp"
-                android:backgroundTint="#88FFFFFF"
-                android:text="DUCK"
-                android:textSize="18sp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_right"
+                android:layout_width="96dp"
+                android:layout_height="72dp"
+                android:background="@drawable/bg_control_button_selector"
+                android:minHeight="64dp"
+                android:minWidth="64dp"
+                android:text="RUN"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                app:icon="@drawable/ic_run_right"
+                app:iconGravity="textTop"
+                app:iconPadding="8dp"
+                app:iconTint="@android:color/white" />
         </LinearLayout>
 
         <View
@@ -87,12 +88,44 @@
             android:layout_height="0dp"
             android:layout_weight="1" />
 
-        <Button
-            android:id="@+id/button_jump"
-            android:layout_width="120dp"
-            android:layout_height="72dp"
-            android:backgroundTint="#AAFFFFFF"
-            android:text="JUMP"
-            android:textSize="20sp" />
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_jump"
+                android:layout_width="120dp"
+                android:layout_height="72dp"
+                android:background="@drawable/bg_control_button_selector"
+                android:layout_marginEnd="8dp"
+                android:minHeight="64dp"
+                android:minWidth="64dp"
+                android:text="JUMP"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                app:icon="@drawable/ic_jump"
+                app:iconGravity="textTop"
+                app:iconPadding="6dp"
+                app:iconTint="@android:color/white" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/button_duck"
+                android:layout_width="120dp"
+                android:layout_height="72dp"
+                android:background="@drawable/bg_control_button_selector"
+                android:minHeight="64dp"
+                android:minWidth="64dp"
+                android:text="CROUCH"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white"
+                android:textSize="16sp"
+                app:icon="@drawable/ic_duck"
+                app:iconGravity="textTop"
+                app:iconPadding="6dp"
+                app:iconTint="@android:color/white" />
+        </LinearLayout>
     </LinearLayout>
 </FrameLayout>
