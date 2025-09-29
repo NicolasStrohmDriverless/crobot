@@ -385,8 +385,9 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             if (kind == null) {
                 continue;
             }
+            AnimatedEnemy animatedSprite = EnemyAnimations.create(kind.typeName);
             EnemyInstance instance = new EnemyInstance(kind, entity.getX(), entity.getY(),
-                    tileWidth, tileHeight, entity.getExtras());
+                    tileWidth, tileHeight, entity.getExtras(), animatedSprite);
             if (instance.kind == EnemyKind.PACKET_HOUND && !isBossWorld) {
                 continue;
             }
@@ -3075,7 +3076,8 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
                       float pixelY,
                       float tileWidth,
                       float tileHeight,
-                      @Nullable Map<String, String> extras) {
+                      @Nullable Map<String, String> extras,
+                      @Nullable AnimatedEnemy animatedSprite) {
             this.kind = kind;
             this.tileWidth = tileWidth;
             this.tileHeight = tileHeight;
@@ -3100,7 +3102,7 @@ public class GameView extends SurfaceView implements SurfaceHolder.Callback, Run
             this.leaderId = this.extras.get("leader");
             this.channel = this.extras.get("channel");
             this.trigger = this.extras.get("trigger");
-            this.animatedSprite = EnemyAnimations.create(kind.typeName);
+            this.animatedSprite = animatedSprite;
         }
 
         @NonNull
